@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum Plan {
+  FREE
+  PRO
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  CANCELED
+  EXPIRED
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+
+  business Business?
+}
+
+model Business {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  services    String
+  hours       String
+  createdAt   DateTime @default(now())
+
+  plan               Plan               @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(TRIALING)
+
+  trialStartedAt DateTime @default(now())
+  trialEndsAt    DateTime?
+
+  subscriptionStartedAt DateTime?
+  subscriptionEndsAt    DateTime?
+
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+
+  aiName          String  @default("Empleado IA")
+  aiPersonality   String  @default("amigable")
+  aiWelcome       String  @default("¡Hola! 👋 Soy el empleado de IA de tu negocio. ¿En qué puedo ayudarte?")
+  aiCanBook       Boolean @default(true)
+  aiCanCancel     Boolean @default(true)
+  aiCanReschedule Boolean @default(true)
+
+  userId Int? @unique
+  user   User? @relation(fields: [userId], references: [id])
+
+  appointments Appointment[]
+  clients      Client[]
+  monthlyUsage MonthlyUsage[]
+}
+
+model Client {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String?
+  email     String?
+  createdAt DateTime @default(now())
+
+  businessId Int
+  business   Business @relation(fields: [businessId], references: [id])
+
+  appointments Appointment[]
+}
+
+model Appointment {
+  id        Int      @id @default(autoincrement())
+  client    String
+  service   String
+  date      String
+  time      String
+  createdAt DateTime @default(now())
+
+  businessId Int?
+  business   Business? @relation(fields: [businessId], references: [id])
+
+  clientId  Int?
+  clientRef Client? @relation(fields: [clientId], references: [id])
+
+  @@unique([businessId, date, time])
+}
+
+model MonthlyUsage {
+  id             Int      @id @default(autoincrement())
+  businessId     Int
+  month          String
+  aiMessagesUsed Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, month])
+  @@index([businessId])
+}
