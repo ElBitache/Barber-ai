@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npx prisma db push && npx prisma generate && next build",
+  "crons": [
+    {
+      "path": "/api/reminders",
+      "schedule": "0 13 * * *"
+    }
+  ]
+}

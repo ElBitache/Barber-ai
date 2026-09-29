@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -69,6 +69,18 @@ export default function Dashboard() {
 
   const [loggingOut, setLoggingOut] =
     useState(false);
+
+  const [sendingEmail, setSendingEmail] =
+    useState(false);
+
+  const [emailMessage, setEmailMessage] =
+    useState("");
+
+  const [sendingSMS, setSendingSMS] =
+    useState(false);
+
+  const [smsMessage, setSMSMessage] =
+    useState("");
 
   useEffect(() => {
     async function loadDashboard() {
@@ -177,6 +189,104 @@ export default function Dashboard() {
 
     loadDashboard();
   }, [router]);
+
+  async function handleTestEmail() {
+    try {
+      setSendingEmail(true);
+      setEmailMessage("");
+
+      const response = await fetch(
+        "/api/email",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            to: "elrockstar160@gmail.com",
+            subject:
+              "BarberAI funciona 🚀",
+            message:
+              "¡Hola! Este correo fue enviado directamente desde tu Dashboard de BarberAI.",
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "No se pudo enviar el correo."
+        );
+      }
+
+      setEmailMessage(
+        "Correo enviado correctamente ✓"
+      );
+    } catch (error) {
+      console.error(
+        "Error enviando email:",
+        error
+      );
+
+      setEmailMessage(
+        "No se pudo enviar el correo."
+      );
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
+  async function handleTestSMS() {
+    try {
+      setSendingSMS(true);
+      setSMSMessage("");
+
+      const response = await fetch(
+        "/api/sms",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            to: "+19566257596",
+            message:
+              "BarberAI SMS de prueba 🚀",
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "No se pudo enviar el SMS."
+        );
+      }
+
+      setSMSMessage(
+        "SMS enviado correctamente ✓"
+      );
+    } catch (error) {
+      console.error(
+        "Error enviando SMS:",
+        error
+      );
+
+      setSMSMessage(
+        "No se pudo enviar el SMS."
+      );
+    } finally {
+      setSendingSMS(false);
+    }
+  }
 
   async function handleLogout() {
     try {
@@ -316,25 +426,29 @@ export default function Dashboard() {
   function getTrialDaysRemaining() {
     if (
       !business?.trialEndsAt ||
-      business.subscriptionStatus !== "TRIALING"
+      business.subscriptionStatus !==
+        "TRIALING"
     ) {
       return null;
     }
 
     const now = new Date();
+
     const trialEnds = new Date(
       business.trialEndsAt
     );
 
     const difference =
-      trialEnds.getTime() - now.getTime();
+      trialEnds.getTime() -
+      now.getTime();
 
     if (difference <= 0) {
       return 0;
     }
 
     return Math.ceil(
-      difference / (1000 * 60 * 60 * 24)
+      difference /
+        (1000 * 60 * 60 * 24)
     );
   }
 
@@ -717,11 +831,13 @@ export default function Dashboard() {
                     </div>
 
                     <div className="mt-2 space-y-2">
+
                       <p className="text-sm text-gray-500">
                         Tu negocio está utilizando este plan de BarberAI.
                       </p>
 
-                      {business.subscriptionStatus === "TRIALING" &&
+                      {business.subscriptionStatus ===
+                        "TRIALING" &&
                         business.trialEndsAt && (
                           <p className="text-sm text-gray-300">
                             🎁 Te quedan{" "}
@@ -731,6 +847,7 @@ export default function Dashboard() {
                             de prueba gratis.
                           </p>
                         )}
+
                     </div>
 
                   </div>
@@ -1015,6 +1132,116 @@ export default function Dashboard() {
                 >
                   Hablar con IA →
                 </button>
+
+              </div>
+
+            </div>
+
+            {/* EMAIL */}
+
+            <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+
+              <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+
+                <div>
+
+                  <p className="text-sm text-gray-500">
+                    Email
+                  </p>
+
+                  <h2 className="mt-2 text-xl font-bold">
+                    Comunicación por correo
+                  </h2>
+
+                  <p className="mt-2 text-sm text-gray-500">
+                    Prueba el sistema de correo de BarberAI.
+                  </p>
+
+                  {emailMessage && (
+                    <p className="mt-3 text-sm text-gray-300">
+                      {emailMessage}
+                    </p>
+                  )}
+
+                </div>
+
+                {business?.plan === "FREE" ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push("/pricing")
+                    }
+                    className="rounded-xl border border-white/10 px-5 py-3 text-sm font-semibold text-gray-400 transition hover:bg-white/5 hover:text-white"
+                  >
+                    🔒 Disponible en Pro
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleTestEmail}
+                    disabled={sendingEmail}
+                    className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {sendingEmail
+                      ? "Enviando..."
+                      : "Enviar email de prueba"}
+                  </button>
+                )}
+
+              </div>
+
+            </div>
+
+            {/* SMS */}
+
+            <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+
+              <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+
+                <div>
+
+                  <p className="text-sm text-gray-500">
+                    SMS
+                  </p>
+
+                  <h2 className="mt-2 text-xl font-bold">
+                    Comunicación por mensaje de texto
+                  </h2>
+
+                  <p className="mt-2 text-sm text-gray-500">
+                    Envía recordatorios y mensajes a tus clientes.
+                  </p>
+
+                  {smsMessage && (
+                    <p className="mt-3 text-sm text-gray-300">
+                      {smsMessage}
+                    </p>
+                  )}
+
+                </div>
+
+                {business?.plan === "FREE" ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push("/pricing")
+                    }
+                    className="rounded-xl border border-white/10 px-5 py-3 text-sm font-semibold text-gray-400 transition hover:bg-white/5 hover:text-white"
+                  >
+                    🔒 Disponible en Pro
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleTestSMS}
+                    disabled={sendingSMS}
+                    className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {sendingSMS
+                      ? "Enviando..."
+                      : "Enviar SMS de prueba"}
+                  </button>
+                )}
 
               </div>
 

@@ -42,7 +42,7 @@ function parseServices(servicesText: string): Service[] {
         .filter((item) => item.name.length > 0);
     }
   } catch {
-    // Continuamos con formato de texto.
+    // Si no es JSON, usamos formato de texto.
   }
 
   return text
@@ -78,95 +78,68 @@ function parseServices(servicesText: string): Service[] {
     .filter((item) => item.name.length > 0);
 }
 
-function getToday() {
+function getToday(): string {
   const today = new Date();
 
   const year = today.getFullYear();
-
-  const month = String(
-    today.getMonth() + 1
-  ).padStart(2, "0");
-
-  const day = String(
-    today.getDate()
-  ).padStart(2, "0");
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
 }
 
-function formatDate(date: string) {
-  const parsed = new Date(
-    `${date}T12:00:00`
-  );
+function formatDate(date: string): string {
+  const parsed = new Date(`${date}T12:00:00`);
 
   if (Number.isNaN(parsed.getTime())) {
     return date;
   }
 
-  return new Intl.DateTimeFormat(
-    "es-MX",
-    {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }
-  ).format(parsed);
+  return new Intl.DateTimeFormat("es-MX", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(parsed);
 }
 
-function formatShortDate(date: string) {
-  const parsed = new Date(
-    `${date}T12:00:00`
-  );
+function formatShortDate(date: string): string {
+  const parsed = new Date(`${date}T12:00:00`);
 
   if (Number.isNaN(parsed.getTime())) {
     return date;
   }
 
-  return new Intl.DateTimeFormat(
-    "es-MX",
-    {
-      day: "numeric",
-      month: "short",
-    }
-  ).format(parsed);
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "short",
+  }).format(parsed);
 }
 
 export default function Appointments() {
   const router = useRouter();
 
-  const [appointments, setAppointments] =
-    useState<Appointment[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [availableServices, setAvailableServices] = useState<Service[]>([]);
 
-  const [availableServices, setAvailableServices] =
-    useState<Service[]>([]);
+  const [showForm, setShowForm] = useState(false);
 
-  const [showForm, setShowForm] =
-    useState(false);
+  const [client, setClient] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
+  const [service, setService] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
 
-  const [client, setClient] =
-    useState("");
-
-  const [service, setService] =
-    useState("");
-
-  const [date, setDate] =
-    useState("");
-
-  const [time, setTime] =
-    useState("");
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [loadingBusiness, setLoadingBusiness] =
-    useState(true);
-
-  const [saving, setSaving] =
-    useState(false);
-
-  const [deletingId, setDeletingId] =
-    useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingBusiness, setLoadingBusiness] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [reschedulingId, setReschedulingId] = useState<number | null>(null);
+  const [showReschedule, setShowReschedule] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
+  const [rescheduleAppointment, setRescheduleAppointment] =
+    useState<Appointment | null>(null);
 
   const today = getToday();
 
@@ -179,32 +152,23 @@ export default function Appointments() {
     try {
       setLoading(true);
 
-      const response = await fetch(
-        "/api/appointments",
-        {
-          cache: "no-store",
-        }
-      );
+      const response = await fetch("/api/appointments", {
+        cache: "no-store",
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.error ||
-            "No se pudieron cargar las citas."
+          data.error || "No se pudieron cargar las citas."
         );
       }
 
       setAppointments(
-        Array.isArray(data.appointments)
-          ? data.appointments
-          : []
+        Array.isArray(data.appointments) ? data.appointments : []
       );
     } catch (error) {
-      console.error(
-        "Error cargando citas:",
-        error
-      );
+      console.error("Error cargando citas:", error);
 
       if (error instanceof Error) {
         alert(error.message);
@@ -218,12 +182,9 @@ export default function Appointments() {
     try {
       setLoadingBusiness(true);
 
-      const response = await fetch(
-        "/api/business",
-        {
-          cache: "no-store",
-        }
-      );
+      const response = await fetch("/api/business", {
+        cache: "no-store",
+      });
 
       const data = await response.json();
 
@@ -234,18 +195,13 @@ export default function Appointments() {
         );
       }
 
-      const business =
-        data.business as Business | null;
+      const business = data.business as Business | null;
 
       if (!business) {
-        throw new Error(
-          "No tienes un negocio configurado."
-        );
+        throw new Error("No tienes un negocio configurado.");
       }
 
-      const services = parseServices(
-        business.services
-      );
+      const services = parseServices(business.services);
 
       setAvailableServices(services);
 
@@ -253,10 +209,7 @@ export default function Appointments() {
         setService(services[0].name);
       }
     } catch (error) {
-      console.error(
-        "Error cargando negocio:",
-        error
-      );
+      console.error("Error cargando negocio:", error);
 
       if (error instanceof Error) {
         alert(error.message);
@@ -268,13 +221,12 @@ export default function Appointments() {
 
   function resetForm() {
     setClient("");
+    setClientEmail("");
     setDate("");
     setTime("");
 
     if (availableServices.length > 0) {
-      setService(
-        availableServices[0].name
-      );
+      setService(availableServices[0].name);
     } else {
       setService("");
     }
@@ -296,65 +248,63 @@ export default function Appointments() {
 
   async function createAppointment() {
     if (!client.trim()) {
-      alert(
-        "Escribe el nombre del cliente."
-      );
+      alert("Escribe el nombre del cliente.");
       return;
     }
 
     if (!service) {
-      alert(
-        "Selecciona un servicio."
-      );
+      alert("Selecciona un servicio.");
       return;
     }
 
     if (!date) {
-      alert(
-        "Selecciona una fecha."
-      );
+      alert("Selecciona una fecha.");
       return;
     }
 
     if (!time) {
-      alert(
-        "Selecciona una hora."
-      );
+      alert("Selecciona una hora.");
       return;
     }
 
     if (date < today) {
-      alert(
-        "No puedes crear una cita en una fecha pasada."
-      );
+      alert("No puedes crear una cita en una fecha pasada.");
       return;
+    }
+
+    const email = clientEmail.trim();
+
+    if (email) {
+      const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+      if (!emailIsValid) {
+        alert("Escribe un correo electrónico válido.");
+        return;
+      }
     }
 
     try {
       setSaving(true);
 
-      const response = await fetch(
-        "/api/appointments",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            client: client.trim(),
-            service,
-            date,
-            time,
-          }),
-        }
-      );
+      const response = await fetch("/api/appointments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          client: client.trim(),
+          clientEmail: email,
+          service,
+          date,
+          time,
+        }),
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.error ||
-            "No se pudo crear la cita."
+          data.error || "No se pudo crear la cita."
         );
       }
 
@@ -365,52 +315,43 @@ export default function Appointments() {
       }
 
       setAppointments((current) =>
-        [...current, data.appointment].sort(
-          (a, b) => {
-            const first =
-              `${a.date} ${a.time}`;
+        [...current, data.appointment].sort((a, b) => {
+          const first = `${a.date} ${a.time}`;
+          const second = `${b.date} ${b.time}`;
 
-            const second =
-              `${b.date} ${b.time}`;
-
-            return first.localeCompare(
-              second
-            );
-          }
-        )
+          return first.localeCompare(second);
+        })
       );
 
       resetForm();
       setShowForm(false);
 
-      alert(
-        "¡Cita creada correctamente! 🚀"
-      );
+      if (email) {
+        alert(
+          "¡Cita creada correctamente! 🚀\n\nSe enviará el correo de confirmación al cliente."
+        );
+      } else {
+        alert(
+          "¡Cita creada correctamente! 🚀\n\nNo se envió correo porque el cliente no tiene email."
+        );
+      }
     } catch (error) {
-      console.error(
-        "Error creando cita:",
-        error
-      );
+      console.error("Error creando cita:", error);
 
       if (error instanceof Error) {
         alert(error.message);
       } else {
-        alert(
-          "No se pudo crear la cita."
-        );
+        alert("No se pudo crear la cita.");
       }
     } finally {
       setSaving(false);
     }
   }
 
-  async function deleteAppointment(
-    id: number
-  ) {
-    const confirmed =
-      window.confirm(
-        "¿Seguro que quieres eliminar esta cita?"
-      );
+  async function deleteAppointment(id: number) {
+    const confirmed = window.confirm(
+      "¿Seguro que quieres eliminar esta cita?"
+    );
 
     if (!confirmed) {
       return;
@@ -419,100 +360,169 @@ export default function Appointments() {
     try {
       setDeletingId(id);
 
-      const response = await fetch(
-        "/api/appointments",
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            id,
-          }),
-        }
-      );
+      const response = await fetch("/api/appointments", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id,
+        }),
+      });
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.error ||
-            "No se pudo eliminar la cita."
+          data.error || "No se pudo eliminar la cita."
         );
       }
 
       setAppointments((current) =>
-        current.filter(
-          (appointment) =>
-            appointment.id !== id
-        )
+        current.filter((appointment) => appointment.id !== id)
       );
     } catch (error) {
-      console.error(
-        "Error eliminando cita:",
-        error
-      );
+      console.error("Error eliminando cita:", error);
 
       if (error instanceof Error) {
         alert(error.message);
       } else {
-        alert(
-          "No se pudo eliminar la cita."
-        );
+        alert("No se pudo eliminar la cita.");
       }
     } finally {
       setDeletingId(null);
     }
   }
 
-  const sortedAppointments =
-    useMemo(() => {
-      return [...appointments].sort(
-        (a, b) => {
-          const first =
-            `${a.date} ${a.time}`;
+  function openReschedule(appointment: Appointment) {
+    setRescheduleAppointment(appointment);
+    setRescheduleDate(appointment.date);
+    setRescheduleTime(appointment.time);
+    setShowReschedule(true);
+  }
 
-          const second =
-            `${b.date} ${b.time}`;
+  function closeReschedule() {
+    if (reschedulingId !== null) {
+      return;
+    }
 
-          return first.localeCompare(
-            second
-          );
-        }
+    setShowReschedule(false);
+    setRescheduleAppointment(null);
+    setRescheduleDate("");
+    setRescheduleTime("");
+  }
+
+  async function updateAppointment() {
+    if (!rescheduleAppointment) {
+      return;
+    }
+
+    if (!rescheduleDate) {
+      alert("Selecciona una nueva fecha.");
+      return;
+    }
+
+    if (!rescheduleTime) {
+      alert("Selecciona una nueva hora.");
+      return;
+    }
+
+    if (rescheduleDate < today) {
+      alert("No puedes reprogramar una cita a una fecha pasada.");
+      return;
+    }
+
+    try {
+      setReschedulingId(rescheduleAppointment.id);
+
+      const response = await fetch("/api/appointments", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: rescheduleAppointment.id,
+          date: rescheduleDate,
+          time: rescheduleTime,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "No se pudo reprogramar la cita."
+        );
+      }
+
+      if (!data.appointment) {
+        throw new Error(
+          "La cita fue reprogramada, pero no se recibieron sus datos."
+        );
+      }
+
+      setAppointments((current) =>
+        current
+          .map((appointment) =>
+            appointment.id === rescheduleAppointment.id
+              ? data.appointment
+              : appointment
+          )
+          .sort((a, b) => {
+            const first = `${a.date} ${a.time}`;
+            const second = `${b.date} ${b.time}`;
+
+            return first.localeCompare(second);
+          })
       );
-    }, [appointments]);
 
-  const todayAppointments =
-    useMemo(() => {
-      return sortedAppointments.filter(
-        (appointment) =>
-          appointment.date === today
-      );
-    }, [
-      sortedAppointments,
-      today,
-    ]);
+      setShowReschedule(false);
+      setRescheduleAppointment(null);
+      setRescheduleDate("");
+      setRescheduleTime("");
 
-  const upcomingAppointments =
-    useMemo(() => {
-      return sortedAppointments.filter(
-        (appointment) =>
-          appointment.date >= today
+      alert(
+        "¡Cita reprogramada correctamente! 🔄\n\nSi el cliente tiene correo, se le enviará automáticamente el correo con la nueva fecha y hora."
       );
-    }, [
-      sortedAppointments,
-      today,
-    ]);
+    } catch (error) {
+      console.error("Error reprogramando cita:", error);
 
-  const futureAppointments =
-    useMemo(() => {
-      return upcomingAppointments.filter(
-        (appointment) =>
-          appointment.date > today
-      );
-    }, [upcomingAppointments, today]);
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert("No se pudo reprogramar la cita.");
+      }
+    } finally {
+      setReschedulingId(null);
+    }
+  }
+
+  const sortedAppointments = useMemo(() => {
+    return [...appointments].sort((a, b) => {
+      const first = `${a.date} ${a.time}`;
+      const second = `${b.date} ${b.time}`;
+
+      return first.localeCompare(second);
+    });
+  }, [appointments]);
+
+  const todayAppointments = useMemo(() => {
+    return sortedAppointments.filter(
+      (appointment) => appointment.date === today
+    );
+  }, [sortedAppointments, today]);
+
+  const upcomingAppointments = useMemo(() => {
+    return sortedAppointments.filter(
+      (appointment) => appointment.date >= today
+    );
+  }, [sortedAppointments, today]);
+
+  const futureAppointments = useMemo(() => {
+    return upcomingAppointments.filter(
+      (appointment) => appointment.date > today
+    );
+  }, [upcomingAppointments, today]);
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -521,13 +531,10 @@ export default function Appointments() {
         {/* HEADER */}
 
         <header className="flex flex-col justify-between gap-6 border-b border-white/10 pb-8 sm:flex-row sm:items-end">
-
           <div>
             <button
               type="button"
-              onClick={() =>
-                router.push("/dashboard")
-              }
+              onClick={() => router.push("/dashboard")}
               className="flex items-center gap-3"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black">
@@ -548,8 +555,8 @@ export default function Appointments() {
             </h1>
 
             <p className="mt-2 max-w-xl text-gray-400">
-              Administra las reservas y mantén
-              organizada la agenda de tu negocio.
+              Administra las reservas y mantén organizada la agenda de tu
+              negocio.
             </p>
           </div>
 
@@ -560,13 +567,11 @@ export default function Appointments() {
           >
             + Nueva cita
           </button>
-
         </header>
 
         {/* ESTADÍSTICAS */}
 
         <section className="mt-8 grid gap-4 sm:grid-cols-3">
-
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
             <p className="text-sm text-gray-500">
               Total de citas
@@ -608,16 +613,13 @@ export default function Appointments() {
               Después de hoy
             </p>
           </div>
-
         </section>
 
         {/* FORMULARIO */}
 
         {showForm && (
           <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-
             <div className="flex flex-col justify-between gap-4 border-b border-white/10 p-6 sm:flex-row sm:items-center">
-
               <div>
                 <p className="text-sm text-gray-500">
                   Nueva reserva
@@ -628,8 +630,7 @@ export default function Appointments() {
                 </h2>
 
                 <p className="mt-1 text-sm text-gray-500">
-                  Añade una reserva directamente
-                  desde el panel.
+                  Añade una reserva directamente desde el panel.
                 </p>
               </div>
 
@@ -641,11 +642,9 @@ export default function Appointments() {
               >
                 ✕ Cerrar
               </button>
-
             </div>
 
             <div className="p-6">
-
               <div className="grid gap-5 sm:grid-cols-2">
 
                 {/* CLIENTE */}
@@ -663,14 +662,42 @@ export default function Appointments() {
                     type="text"
                     value={client}
                     onChange={(event) =>
-                      setClient(
-                        event.target.value
-                      )
+                      setClient(event.target.value)
                     }
                     placeholder="Ej. Juan Pérez"
                     autoComplete="name"
                     className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none placeholder:text-gray-600 focus:border-white/30"
                   />
+                </div>
+
+                {/* EMAIL */}
+
+                <div>
+                  <label
+                    htmlFor="clientEmail"
+                    className="mb-2 block text-sm font-semibold text-gray-300"
+                  >
+                    Correo del cliente
+                    <span className="ml-2 text-xs font-normal text-gray-600">
+                      opcional
+                    </span>
+                  </label>
+
+                  <input
+                    id="clientEmail"
+                    type="email"
+                    value={clientEmail}
+                    onChange={(event) =>
+                      setClientEmail(event.target.value)
+                    }
+                    placeholder="Ej. juan@email.com"
+                    autoComplete="email"
+                    className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none placeholder:text-gray-600 focus:border-white/30"
+                  />
+
+                  <p className="mt-2 text-xs text-gray-600">
+                    Se usará para enviar la confirmación de la cita.
+                  </p>
                 </div>
 
                 {/* SERVICIO */}
@@ -687,14 +714,11 @@ export default function Appointments() {
                     id="service"
                     value={service}
                     onChange={(event) =>
-                      setService(
-                        event.target.value
-                      )
+                      setService(event.target.value)
                     }
                     disabled={
                       loadingBusiness ||
-                      availableServices.length ===
-                        0
+                      availableServices.length === 0
                     }
                     className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-white/30 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -704,27 +728,21 @@ export default function Appointments() {
                         : "Selecciona un servicio"}
                     </option>
 
-                    {availableServices.map(
-                      (item) => (
-                        <option
-                          key={item.name}
-                          value={item.name}
-                        >
-                          {item.name}
-                          {item.price
-                            ? ` — ${item.price}`
-                            : ""}
-                        </option>
-                      )
-                    )}
+                    {availableServices.map((item) => (
+                      <option
+                        key={item.name}
+                        value={item.name}
+                      >
+                        {item.name}
+                        {item.price ? ` — ${item.price}` : ""}
+                      </option>
+                    ))}
                   </select>
 
                   {!loadingBusiness &&
-                    availableServices.length ===
-                      0 && (
+                    availableServices.length === 0 && (
                       <p className="mt-2 text-sm text-gray-500">
-                        Configura primero los
-                        servicios en Configuración.
+                        Configura primero los servicios en Configuración.
                       </p>
                     )}
                 </div>
@@ -745,9 +763,7 @@ export default function Appointments() {
                     value={date}
                     min={today}
                     onChange={(event) =>
-                      setDate(
-                        event.target.value
-                      )
+                      setDate(event.target.value)
                     }
                     className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-white/30"
                     style={{
@@ -777,9 +793,7 @@ export default function Appointments() {
                     type="time"
                     value={time}
                     onChange={(event) =>
-                      setTime(
-                        event.target.value
-                      )
+                      setTime(event.target.value)
                     }
                     className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-white/30"
                     style={{
@@ -787,77 +801,74 @@ export default function Appointments() {
                     }}
                   />
                 </div>
-
               </div>
 
               {/* RESUMEN */}
 
-              {client &&
-                service &&
-                date &&
-                time && (
-                  <div className="mt-6 rounded-xl border border-white/10 bg-black p-5">
+              {client && service && date && time && (
+                <div className="mt-6 rounded-xl border border-white/10 bg-black p-5">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-600">
+                    Resumen
+                  </p>
 
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-600">
-                      Resumen
-                    </p>
+                  <div className="mt-3 grid gap-3 text-sm sm:grid-cols-4">
+                    <div>
+                      <p className="text-gray-600">
+                        Cliente
+                      </p>
 
-                    <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
-
-                      <div>
-                        <p className="text-gray-600">
-                          Cliente
-                        </p>
-
-                        <p className="mt-1 font-medium">
-                          {client}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-gray-600">
-                          Servicio
-                        </p>
-
-                        <p className="mt-1 font-medium">
-                          {service}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-gray-600">
-                          Fecha y hora
-                        </p>
-
-                        <p className="mt-1 font-medium">
-                          {formatShortDate(date)}{" "}
-                          · {time}
-                        </p>
-                      </div>
-
+                      <p className="mt-1 font-medium">
+                        {client}
+                      </p>
                     </div>
 
+                    <div>
+                      <p className="text-gray-600">
+                        Servicio
+                      </p>
+
+                      <p className="mt-1 font-medium">
+                        {service}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-gray-600">
+                        Fecha
+                      </p>
+
+                      <p className="mt-1 font-medium">
+                        {formatShortDate(date)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-gray-600">
+                        Hora
+                      </p>
+
+                      <p className="mt-1 font-medium">
+                        {time}
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
+              )}
+
+              {/* BOTONES */}
 
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-
                 <button
                   type="button"
-                  onClick={() =>
-                    void createAppointment()
-                  }
+                  onClick={() => void createAppointment()}
                   disabled={
                     saving ||
                     loadingBusiness ||
-                    availableServices.length ===
-                      0
+                    availableServices.length === 0
                   }
                   className="rounded-xl bg-white px-6 py-3 font-bold text-black transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {saving
-                    ? "Guardando..."
-                    : "Crear cita"}
+                  {saving ? "Guardando..." : "Crear cita"}
                 </button>
 
                 <button
@@ -868,9 +879,188 @@ export default function Appointments() {
                 >
                   Cancelar
                 </button>
+              </div>
+            </div>
+          </section>
+        )}
 
+        {/* MODAL DE REPROGRAMACIÓN */}
+
+        {showReschedule && rescheduleAppointment && (
+          <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+            <div className="flex flex-col justify-between gap-4 border-b border-white/10 p-6 sm:flex-row sm:items-center">
+              <div>
+                <p className="text-sm text-gray-500">
+                  Modificar reserva
+                </p>
+
+                <h2 className="mt-1 text-2xl font-bold">
+                  Reprogramar cita
+                </h2>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  {rescheduleAppointment.client} ·{" "}
+                  {rescheduleAppointment.service}
+                </p>
               </div>
 
+              <button
+                type="button"
+                onClick={closeReschedule}
+                disabled={reschedulingId !== null}
+                className="self-start rounded-lg border border-white/10 px-3 py-2 text-sm text-gray-400 transition hover:bg-white/5 hover:text-white disabled:opacity-50 sm:self-auto"
+              >
+                ✕ Cerrar
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="rounded-xl border border-white/10 bg-black p-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-600">
+                  Cita actual
+                </p>
+
+                <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <p className="text-gray-600">
+                      Fecha
+                    </p>
+
+                    <p className="mt-1 font-medium capitalize">
+                      {formatDate(rescheduleAppointment.date)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-600">
+                      Hora
+                    </p>
+
+                    <p className="mt-1 font-medium">
+                      {rescheduleAppointment.time}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-5 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="rescheduleDate"
+                    className="mb-2 block text-sm font-semibold text-gray-300"
+                  >
+                    Nueva fecha
+                  </label>
+
+                  <input
+                    id="rescheduleDate"
+                    type="date"
+                    value={rescheduleDate}
+                    min={today}
+                    onChange={(event) =>
+                      setRescheduleDate(event.target.value)
+                    }
+                    className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none placeholder:text-gray-600 focus:border-white/30"
+                    style={{
+                      colorScheme: "dark",
+                    }}
+                  />
+
+                  {rescheduleDate && (
+                    <p className="mt-2 text-xs capitalize text-gray-500">
+                      {formatDate(rescheduleDate)}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="rescheduleTime"
+                    className="mb-2 block text-sm font-semibold text-gray-300"
+                  >
+                    Nueva hora
+                  </label>
+
+                  <input
+                    id="rescheduleTime"
+                    type="time"
+                    value={rescheduleTime}
+                    onChange={(event) =>
+                      setRescheduleTime(event.target.value)
+                    }
+                    className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-white/30"
+                    style={{
+                      colorScheme: "dark",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {rescheduleDate && rescheduleTime && (
+                <div className="mt-6 rounded-xl border border-white/10 bg-black p-5">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-600">
+                    Nueva reserva
+                  </p>
+
+                  <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+                    <div>
+                      <p className="text-gray-600">
+                        Cliente
+                      </p>
+
+                      <p className="mt-1 font-medium">
+                        {rescheduleAppointment.client}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-gray-600">
+                        Fecha
+                      </p>
+
+                      <p className="mt-1 font-medium capitalize">
+                        {formatShortDate(rescheduleDate)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-gray-600">
+                        Hora
+                      </p>
+
+                      <p className="mt-1 font-medium">
+                        {rescheduleTime}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => void updateAppointment()}
+                  disabled={
+                    reschedulingId !== null ||
+                    !rescheduleDate ||
+                    !rescheduleTime
+                  }
+                  className="rounded-xl bg-white px-6 py-3 font-bold text-black transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {reschedulingId !== null
+                    ? "Reprogramando..."
+                    : "Guardar nueva fecha"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={closeReschedule}
+                  disabled={reschedulingId !== null}
+                  className="rounded-xl border border-white/10 px-6 py-3 font-semibold text-gray-300 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           </section>
         )}
@@ -878,11 +1068,8 @@ export default function Appointments() {
         {/* CITAS DE HOY */}
 
         <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-
           <div className="border-b border-white/10 p-6">
-
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-
               <div>
                 <p className="text-sm text-gray-500">
                   Agenda
@@ -899,9 +1086,7 @@ export default function Appointments() {
                   ? "cita"
                   : "citas"}
               </span>
-
             </div>
-
           </div>
 
           {loading ? (
@@ -912,10 +1097,8 @@ export default function Appointments() {
                 Cargando agenda...
               </p>
             </div>
-          ) : todayAppointments.length ===
-            0 ? (
+          ) : todayAppointments.length === 0 ? (
             <div className="p-8 text-center">
-
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-black text-2xl">
                 📅
               </div>
@@ -935,70 +1118,69 @@ export default function Appointments() {
               >
                 Crear una cita
               </button>
-
             </div>
           ) : (
             <div className="divide-y divide-white/10">
-
-              {todayAppointments.map(
-                (appointment) => (
-                  <article
-                    key={appointment.id}
-                    className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center"
-                  >
-
-                    <div className="flex items-center gap-4">
-
-                      <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black font-bold">
-                        {appointment.time}
-                      </div>
-
-                      <div>
-                        <h3 className="font-semibold">
-                          {appointment.client}
-                        </h3>
-
-                        <p className="mt-1 text-sm text-gray-500">
-                          ✂️ {appointment.service}
-                        </p>
-                      </div>
-
+              {todayAppointments.map((appointment) => (
+                <article
+                  key={appointment.id}
+                  className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black font-bold">
+                      {appointment.time}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void deleteAppointment(
-                          appointment.id
-                        )
-                      }
-                      disabled={
-                        deletingId ===
-                        appointment.id
-                      }
-                      className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-gray-400 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {deletingId ===
-                      appointment.id
-                        ? "Eliminando..."
-                        : "Eliminar"}
-                    </button>
+                    <div>
+                      <h3 className="font-semibold">
+                        {appointment.client}
+                      </h3>
 
-                  </article>
-                )
-              )}
+                      <p className="mt-1 text-sm text-gray-500">
+                        ✂️ {appointment.service}
+                      </p>
+                    </div>
+                  </div>
 
+                   <div className="flex flex-col gap-2 sm:flex-row">
+                     <button
+                       type="button"
+                       onClick={() => openReschedule(appointment)}
+                       disabled={
+                         deletingId === appointment.id ||
+                         reschedulingId !== null
+                       }
+                       className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-gray-400 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                     >
+                       Reprogramar
+                     </button>
+
+                     <button
+                       type="button"
+                       onClick={() =>
+                         void deleteAppointment(appointment.id)
+                       }
+                       disabled={
+                         deletingId === appointment.id ||
+                         reschedulingId !== null
+                       }
+                       className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-gray-400 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                     >
+                       {deletingId === appointment.id
+                         ? "Eliminando..."
+                         : "Eliminar"}
+                     </button>
+                   </div>
+                </article>
+              ))}
             </div>
           )}
-
         </section>
 
         {/* PRÓXIMAS CITAS */}
 
         <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-
           <div className="border-b border-white/10 p-6">
-
             <p className="text-sm text-gray-500">
               Agenda futura
             </p>
@@ -1010,13 +1192,10 @@ export default function Appointments() {
             <p className="mt-1 text-sm text-gray-500">
               Tus reservas después de hoy.
             </p>
-
           </div>
 
-          {futureAppointments.length ===
-          0 ? (
+          {futureAppointments.length === 0 ? (
             <div className="p-8 text-center">
-
               <p className="font-semibold">
                 No tienes citas futuras.
               </p>
@@ -1024,74 +1203,70 @@ export default function Appointments() {
               <p className="mt-1 text-sm text-gray-500">
                 Las nuevas reservas aparecerán aquí.
               </p>
-
             </div>
           ) : (
             <div className="divide-y divide-white/10">
+              {futureAppointments.map((appointment) => (
+                <article
+                  key={appointment.id}
+                  className="flex flex-col justify-between gap-5 p-5 sm:flex-row sm:items-center"
+                >
+                  <div>
+                    <h3 className="font-semibold">
+                      {appointment.client}
+                    </h3>
 
-              {futureAppointments.map(
-                (appointment) => (
-                  <article
-                    key={appointment.id}
-                    className="flex flex-col justify-between gap-5 p-5 sm:flex-row sm:items-center"
-                  >
+                    <p className="mt-1 text-sm text-gray-500">
+                      ✂️ {appointment.service}
+                    </p>
+                  </div>
 
-                    <div>
-                      <h3 className="font-semibold">
-                        {appointment.client}
-                      </h3>
+                  <div className="flex items-center gap-4">
+                    <div className="text-left sm:text-right">
+                      <p className="font-semibold">
+                        {appointment.time}
+                      </p>
 
-                      <p className="mt-1 text-sm text-gray-500">
-                        ✂️ {appointment.service}
+                      <p className="mt-1 text-sm capitalize text-gray-500">
+                        {formatDate(appointment.date)}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                     <div className="flex flex-col gap-2 sm:flex-row">
+                       <button
+                         type="button"
+                         onClick={() => openReschedule(appointment)}
+                         disabled={
+                           deletingId === appointment.id ||
+                           reschedulingId !== null
+                         }
+                         className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-gray-400 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                       >
+                         Reprogramar
+                       </button>
 
-                      <div className="text-left sm:text-right">
-
-                        <p className="font-semibold">
-                          {appointment.time}
-                        </p>
-
-                        <p className="mt-1 text-sm capitalize text-gray-500">
-                          {formatDate(
-                            appointment.date
-                          )}
-                        </p>
-
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void deleteAppointment(
-                            appointment.id
-                          )
-                        }
-                        disabled={
-                          deletingId ===
-                          appointment.id
-                        }
-                        className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-gray-400 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {deletingId ===
-                        appointment.id
-                          ? "..."
-                          : "Eliminar"}
-                      </button>
-
-                    </div>
-
-                  </article>
-                )
-              )}
-
+                       <button
+                         type="button"
+                         onClick={() =>
+                           void deleteAppointment(appointment.id)
+                         }
+                         disabled={
+                           deletingId === appointment.id ||
+                           reschedulingId !== null
+                         }
+                         className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-gray-400 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                       >
+                         {deletingId === appointment.id
+                           ? "..."
+                           : "Eliminar"}
+                       </button>
+                     </div>
+                  </div>
+                </article>
+              ))}
             </div>
           )}
-
         </section>
-
       </div>
     </main>
   );
