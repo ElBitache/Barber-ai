@@ -33,7 +33,7 @@ model Business {
   stripeSubscriptionId       String?            @unique
   aiName                     String             @default("Empleado IA")
   aiPersonality              String             @default("amigable")
-  aiWelcome                  String             @default("¡Hola! 👋 Soy el empleado de IA de tu negocio. ¿En qué puedo ayudarte?")
+  aiWelcome                 String             @default("¡Hola! 👋 Soy el empleado de IA de tu negocio. ¿En qué puedo ayudarte?")
   aiCanBook                  Boolean            @default(true)
   aiCanCancel                Boolean            @default(true)
   aiCanReschedule            Boolean            @default(true)
@@ -65,6 +65,7 @@ model Appointment {
   time           String
   createdAt      DateTime  @default(now())
   reminderSentAt DateTime?
+  googleEventId  String?
   businessId     Int?
   clientId       Int?
   business       Business? @relation(fields: [businessId], references: [id])

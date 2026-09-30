@@ -4,9 +4,11 @@ import { NextResponse } from "next/server";
 import { google } from "googleapis";
 import { Resend } from "resend";
 
-const resend = new Resend(
-  process.env.RESEND_API_KEY
-);
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
+
+const GOOGLE_TIME_ZONE = "America/Chicago";
 
 type BusinessService = {
   name: string;
@@ -27,9 +29,11 @@ const CLIENT_LIMITS = {
   BUSINESS: null,
 } as const;
 
-function parseServices(
-  servicesText: string
-): BusinessService[] {
+// =====================================================
+// HELPERS
+// =====================================================
+
+function parseServices(servicesText: string): BusinessService[] {
   const text = String(servicesText || "").trim();
 
   if (!text) {
@@ -91,9 +95,7 @@ function normalizeText(value: string) {
     .replace(/\s+/g, " ");
 }
 
-function parseHours(
-  hoursText: string
-): BusinessHours | null {
+function parseHours(hoursText: string): BusinessHours | null {
   const text = String(hoursText || "").trim();
 
   if (!text) {
@@ -195,7 +197,7 @@ function normalizeHoursObject(
       translateDayToSpanish(day),
     ];
 
-    let rawDay: unknown | undefined = undefined;
+    let rawDay: unknown | undefined;
 
     for (const key of possibleKeys) {
       if (value[key] !== undefined) {
@@ -211,10 +213,8 @@ function normalizeHoursObject(
       continue;
     }
 
-    const dayObject = rawDay as Record<
-      string,
-      unknown
-    >;
+    const dayObject =
+      rawDay as Record<string, unknown>;
 
     const open = String(
       dayObject.open || ""
@@ -242,9 +242,7 @@ function normalizeHoursObject(
   return result;
 }
 
-function translateDay(
-  day: string
-): string | null {
+function translateDay(day: string): string | null {
   const days: Record<string, string> = {
     sunday: "Sunday",
     domingo: "Sunday",
@@ -273,9 +271,7 @@ function translateDay(
   return days[day] || null;
 }
 
-function translateDayToSpanish(
-  day: string
-): string {
+function translateDayToSpanish(day: string): string {
   const days: Record<string, string> = {
     Sunday: "domingo",
     Monday: "lunes",
@@ -294,11 +290,7 @@ function getDayName(date: string) {
     `${date}T12:00:00`
   );
 
-  if (
-    Number.isNaN(
-      parsedDate.getTime()
-    )
-  ) {
+  if (Number.isNaN(parsedDate.getTime())) {
     return null;
   }
 
@@ -317,12 +309,8 @@ function getDayName(date: string) {
   return days[day];
 }
 
-function isValidDateFormat(
-  date: string
-) {
-  if (
-    !/^\d{4}-\d{2}-\d{2}$/.test(date)
-  ) {
+function isValidDateFormat(date: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return false;
   }
 
@@ -330,19 +318,13 @@ function isValidDateFormat(
     `${date}T12:00:00`
   );
 
-  if (
-    Number.isNaN(
-      parsed.getTime()
-    )
-  ) {
+  if (Number.isNaN(parsed.getTime())) {
     return false;
   }
 
-  const [
-    year,
-    month,
-    day,
-  ] = date.split("-").map(Number);
+  const [year, month, day] = date
+    .split("-")
+    .map(Number);
 
   return (
     parsed.getFullYear() === year &&
@@ -351,19 +333,14 @@ function isValidDateFormat(
   );
 }
 
-function isValidTimeFormat(
-  time: string
-) {
-  if (
-    !/^\d{2}:\d{2}$/.test(time)
-  ) {
+function isValidTimeFormat(time: string) {
+  if (!/^\d{2}:\d{2}$/.test(time)) {
     return false;
   }
 
-  const [
-    hour,
-    minute,
-  ] = time.split(":").map(Number);
+  const [hour, minute] = time
+    .split(":")
+    .map(Number);
 
   return (
     hour >= 0 &&
@@ -373,15 +350,29 @@ function isValidTimeFormat(
   );
 }
 
-function timeToMinutes(
-  time: string
-) {
-  const [
-    hour,
-    minute,
-  ] = time.split(":").map(Number);
+function timeToMinutes(time: string) {
+  const [hour, minute] = time
+    .split(":")
+    .map(Number);
 
   return hour * 60 + minute;
+}
+
+function minutesToTime(totalMinutes: number) {
+  const normalized =
+    totalMinutes % (24 * 60);
+
+  const hour = Math.floor(
+    normalized / 60
+  );
+
+  const minute =
+    normalized % 60;
+
+  return `${String(hour).padStart(
+    2,
+    "0"
+  )}:${String(minute).padStart(2, "0")}`;
 }
 
 function isPrismaUniqueConstraintError(
@@ -404,12 +395,259 @@ function isPrismaUniqueConstraintError(
   );
 }
 
-function isValidEmail(
-  email: string
-) {
+function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
     email
   );
+}
+
+// =====================================================
+// GOOGLE CALENDAR
+// =====================================================
+
+function getGoogleOAuthClient() {
+  const clientId =
+    process.env.GOOGLE_CLIENT_ID;
+
+  const clientSecret =
+    process.env.GOOGLE_CLIENT_SECRET;
+
+  const redirectUri =
+    process.env.GOOGLE_REDIRECT_URI;
+
+  if (
+    !clientId ||
+    !clientSecret ||
+    !redirectUri
+  ) {
+    return null;
+  }
+
+  return new google.auth.OAuth2(
+    clientId,
+    clientSecret,
+    redirectUri
+  );
+}
+
+async function getGoogleCalendar(
+  refreshToken: string
+) {
+  const oauth2Client =
+    getGoogleOAuthClient();
+
+  if (!oauth2Client) {
+    throw new Error(
+      "Faltan GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET o GOOGLE_REDIRECT_URI."
+    );
+  }
+
+  oauth2Client.setCredentials({
+    refresh_token: refreshToken,
+  });
+
+  return google.calendar({
+    version: "v3",
+    auth: oauth2Client,
+  });
+}
+
+function getGoogleEventTimes(
+  date: string,
+  time: string
+) {
+  const startMinutes =
+    timeToMinutes(time);
+
+  const endMinutes =
+    startMinutes + 60;
+
+  const endDate =
+    endMinutes >= 24 * 60
+      ? addDaysToDate(date, 1)
+      : date;
+
+  const endTime =
+    minutesToTime(endMinutes);
+
+  return {
+    start: `${date}T${time}:00`,
+    end: `${endDate}T${endTime}:00`,
+  };
+}
+
+function addDaysToDate(
+  date: string,
+  days: number
+) {
+  const [year, month, day] =
+    date.split("-").map(Number);
+
+  const result = new Date(
+    year,
+    month - 1,
+    day
+  );
+
+  result.setDate(
+    result.getDate() + days
+  );
+
+  return [
+    result.getFullYear(),
+    String(
+      result.getMonth() + 1
+    ).padStart(2, "0"),
+    String(
+      result.getDate()
+    ).padStart(2, "0"),
+  ].join("-");
+}
+
+async function createGoogleEvent(params: {
+  refreshToken: string;
+  businessName: string;
+  client: string;
+  service: string;
+  date: string;
+  time: string;
+}) {
+  const calendar =
+    await getGoogleCalendar(
+      params.refreshToken
+    );
+
+  const eventTimes =
+    getGoogleEventTimes(
+      params.date,
+      params.time
+    );
+
+  const response =
+    await calendar.events.insert({
+      calendarId: "primary",
+
+      requestBody: {
+        summary: `${params.service} - ${params.client}`,
+
+        description:
+          `Cita creada desde BarberAI.\n\n` +
+          `Negocio: ${params.businessName}\n` +
+          `Cliente: ${params.client}\n` +
+          `Servicio: ${params.service}\n` +
+          `Fecha: ${params.date}\n` +
+          `Hora: ${params.time}`,
+
+        start: {
+          dateTime:
+            eventTimes.start,
+
+          timeZone:
+            GOOGLE_TIME_ZONE,
+        },
+
+        end: {
+          dateTime:
+            eventTimes.end,
+
+          timeZone:
+            GOOGLE_TIME_ZONE,
+        },
+      },
+    });
+
+  return response.data.id || null;
+}
+
+async function updateGoogleEvent(params: {
+  refreshToken: string;
+  eventId: string;
+  businessName: string;
+  client: string;
+  service: string;
+  date: string;
+  time: string;
+}) {
+  const calendar =
+    await getGoogleCalendar(
+      params.refreshToken
+    );
+
+  const eventTimes =
+    getGoogleEventTimes(
+      params.date,
+      params.time
+    );
+
+  await calendar.events.update({
+    calendarId: "primary",
+
+    eventId:
+      params.eventId,
+
+    requestBody: {
+      summary: `${params.service} - ${params.client}`,
+
+      description:
+        `Cita actualizada desde BarberAI.\n\n` +
+        `Negocio: ${params.businessName}\n` +
+        `Cliente: ${params.client}\n` +
+        `Servicio: ${params.service}\n` +
+        `Fecha: ${params.date}\n` +
+        `Hora: ${params.time}`,
+
+      start: {
+        dateTime:
+          eventTimes.start,
+
+        timeZone:
+          GOOGLE_TIME_ZONE,
+      },
+
+      end: {
+        dateTime:
+          eventTimes.end,
+
+        timeZone:
+          GOOGLE_TIME_ZONE,
+      },
+    },
+  });
+}
+
+async function deleteGoogleEvent(params: {
+  refreshToken: string;
+  eventId: string;
+}) {
+  const calendar =
+    await getGoogleCalendar(
+      params.refreshToken
+    );
+
+  try {
+    await calendar.events.delete({
+      calendarId: "primary",
+
+      eventId:
+        params.eventId,
+    });
+  } catch (error: any) {
+    const status =
+      error?.response?.status;
+
+    if (
+      status === 404 ||
+      status === 410
+    ) {
+      console.log(
+        "ℹ️ El evento de Google ya no existía."
+      );
+
+      return;
+    }
+
+    throw error;
+  }
 }
 
 // =====================================================
@@ -471,6 +709,7 @@ export async function GET() {
           {
             date: "asc",
           },
+
           {
             time: "asc",
           },
@@ -506,10 +745,6 @@ export async function POST(
   request: Request
 ) {
   try {
-    // ===================================================
-    // AUTENTICACIÓN
-    // ===================================================
-
     const userId =
       await getSessionUserId();
 
@@ -525,10 +760,6 @@ export async function POST(
       );
     }
 
-    // ===================================================
-    // BUSCAR NEGOCIO
-    // ===================================================
-
     const business =
       await prisma.business.findUnique({
         where: {
@@ -541,12 +772,8 @@ export async function POST(
           services: true,
           hours: true,
           plan: true,
-
-          googleCalendarConnected:
-            true,
-
-          googleCalendarRefreshToken:
-            true,
+          googleCalendarConnected: true,
+          googleCalendarRefreshToken: true,
         },
       });
 
@@ -561,10 +788,6 @@ export async function POST(
         }
       );
     }
-
-    // ===================================================
-    // LEER DATOS
-    // ===================================================
 
     const body =
       await request.json();
@@ -595,7 +818,7 @@ export async function POST(
       ).trim();
 
     // ===================================================
-    // VALIDACIONES BÁSICAS
+    // VALIDACIONES
     // ===================================================
 
     if (
@@ -615,9 +838,7 @@ export async function POST(
       );
     }
 
-    if (
-      client.length > 100
-    ) {
+    if (client.length > 100) {
       return NextResponse.json(
         {
           error:
@@ -644,9 +865,7 @@ export async function POST(
       );
     }
 
-    if (
-      clientEmail.length > 255
-    ) {
+    if (clientEmail.length > 255) {
       return NextResponse.json(
         {
           error:
@@ -658,9 +877,7 @@ export async function POST(
       );
     }
 
-    if (
-      service.length > 100
-    ) {
+    if (service.length > 100) {
       return NextResponse.json(
         {
           error:
@@ -672,13 +889,7 @@ export async function POST(
       );
     }
 
-    // ===================================================
-    // VALIDAR FECHA
-    // ===================================================
-
-    if (
-      !isValidDateFormat(date)
-    ) {
+    if (!isValidDateFormat(date)) {
       return NextResponse.json(
         {
           error:
@@ -690,13 +901,7 @@ export async function POST(
       );
     }
 
-    // ===================================================
-    // VALIDAR HORA
-    // ===================================================
-
-    if (
-      !isValidTimeFormat(time)
-    ) {
+    if (!isValidTimeFormat(time)) {
       return NextResponse.json(
         {
           error:
@@ -716,11 +921,6 @@ export async function POST(
       parseServices(
         business.services
       );
-
-    console.log(
-      "🛠️ Servicios del negocio:",
-      services
-    );
 
     const selectedService =
       services.find(
@@ -761,11 +961,6 @@ export async function POST(
       );
 
     if (!hours) {
-      console.error(
-        "❌ No se pudo interpretar el horario:",
-        business.hours
-      );
-
       return NextResponse.json(
         {
           error:
@@ -905,7 +1100,6 @@ export async function POST(
               business.id,
 
             date,
-
             time,
           },
         },
@@ -944,7 +1138,7 @@ export async function POST(
       });
 
     // ===================================================
-    // CREAR CLIENTE SI NO EXISTE
+    // CREAR CLIENTE
     // ===================================================
 
     if (!clientRecord) {
@@ -1009,22 +1203,6 @@ export async function POST(
                 business.id,
             },
           });
-
-        console.log(
-          "👤 Cliente creado automáticamente:",
-          {
-            businessId:
-              business.id,
-
-            clientId:
-              clientRecord.id,
-
-            hasEmail:
-              Boolean(
-                clientEmail
-              ),
-          }
-        );
       } catch (error) {
         if (
           isPrismaUniqueConstraintError(
@@ -1082,18 +1260,16 @@ export async function POST(
               clientEmail,
           },
         });
-
-      console.log(
-        "📧 Email del cliente actualizado."
-      );
     }
 
     // ===================================================
-    // CREAR CITA
+    // CREAR CITA EN DATABASE
     // ===================================================
 
+    let appointment;
+
     try {
-      const appointment =
+      appointment =
         await prisma.appointment.create({
           data: {
             client,
@@ -1116,271 +1292,6 @@ export async function POST(
             clientRef: true,
           },
         });
-
-      console.log(
-        "✅ Cita creada:",
-        {
-          appointmentId:
-            appointment.id,
-
-          businessId:
-            business.id,
-
-          date,
-
-          time,
-        }
-      );
-
-      // ===================================================
-      // GOOGLE CALENDAR
-      // ===================================================
-
-      if (
-        business.googleCalendarConnected &&
-        business.googleCalendarRefreshToken
-      ) {
-        try {
-          const clientId =
-            process.env.GOOGLE_CLIENT_ID;
-
-          const clientSecret =
-            process.env.GOOGLE_CLIENT_SECRET;
-
-          if (
-            !clientId ||
-            !clientSecret
-          ) {
-            console.error(
-              "❌ Google Calendar: faltan GOOGLE_CLIENT_ID o GOOGLE_CLIENT_SECRET."
-            );
-          } else {
-            const oauth2Client =
-              new google.auth.OAuth2(
-                clientId,
-                clientSecret,
-                "http://localhost:3000/api/google/callback"
-              );
-
-            oauth2Client.setCredentials({
-              refresh_token:
-                business.googleCalendarRefreshToken,
-            });
-
-            const calendar =
-              google.calendar({
-                version: "v3",
-                auth: oauth2Client,
-              });
-
-            const startDateTime =
-              `${date}T${time}:00`;
-
-            const start =
-              new Date(
-                `${startDateTime}-05:00`
-              );
-
-            const end =
-              new Date(
-                start.getTime() +
-                  60 * 60 * 1000
-              );
-
-            await calendar.events.insert({
-              calendarId:
-                "primary",
-
-              requestBody: {
-                summary:
-                  `${selectedService.name} - ${client}`,
-
-                description:
-                  `Cita creada desde BarberAI.\n\nCliente: ${client}\nServicio: ${selectedService.name}\nFecha: ${date}\nHora: ${time}`,
-
-                start: {
-                  dateTime:
-                    start.toISOString(),
-
-                  timeZone:
-                    "America/Chicago",
-                },
-
-                end: {
-                  dateTime:
-                    end.toISOString(),
-
-                  timeZone:
-                    "America/Chicago",
-                },
-              },
-            });
-
-            console.log(
-              "✅ Evento creado en Google Calendar."
-            );
-          }
-        } catch (googleError) {
-          console.error(
-            "❌ No se pudo crear el evento en Google Calendar:",
-            googleError
-          );
-        }
-      } else {
-        console.log(
-          "ℹ️ Google Calendar no está conectado para este negocio."
-        );
-      }
-
-      // ===================================================
-      // EMAIL DE CONFIRMACIÓN
-      // ===================================================
-
-      if (clientRecord.email) {
-        try {
-          const resendApiKey =
-            process.env.RESEND_API_KEY;
-
-          if (!resendApiKey) {
-            console.error(
-              "❌ Resend: falta RESEND_API_KEY."
-            );
-          } else {
-            const formattedDate =
-              new Intl.DateTimeFormat(
-                "es-MX",
-                {
-                  weekday:
-                    "long",
-                  day:
-                    "numeric",
-                  month:
-                    "long",
-                  year:
-                    "numeric",
-                }
-              ).format(
-                new Date(
-                  `${date}T12:00:00`
-                )
-              );
-
-            const { data, error } =
-              await resend.emails.send({
-                from:
-                  "BarberAI <onboarding@resend.dev>",
-
-                to: [
-                  clientRecord.email,
-                ],
-
-                subject:
-                  `Confirmación de tu cita en ${business.name}`,
-
-                text:
-                  `Hola ${clientRecord.name},
-
-Tu cita ha sido confirmada correctamente.
-
-Negocio: ${business.name}
-Servicio: ${selectedService.name}
-Fecha: ${formattedDate}
-Hora: ${time}
-
-Te esperamos. ✂️
-
-Este correo fue enviado automáticamente por BarberAI.`,
-
-                html: `
-                  <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
-                    <h2>¡Cita confirmada! ✂️</h2>
-
-                    <p>Hola ${clientRecord.name},</p>
-
-                    <p>
-                      Tu cita ha sido confirmada correctamente.
-                    </p>
-
-                    <div style="
-                      margin: 24px 0;
-                      padding: 20px;
-                      border: 1px solid #e5e5e5;
-                      border-radius: 12px;
-                    ">
-                      <p>
-                        <strong>Negocio:</strong>
-                        ${business.name}
-                      </p>
-
-                      <p>
-                        <strong>Servicio:</strong>
-                        ${selectedService.name}
-                      </p>
-
-                      <p>
-                        <strong>Fecha:</strong>
-                        ${formattedDate}
-                      </p>
-
-                      <p>
-                        <strong>Hora:</strong>
-                        ${time}
-                      </p>
-                    </div>
-
-                    <p>
-                      Te esperamos. ✂️
-                    </p>
-
-                    <p style="color: #777; font-size: 12px;">
-                      Este correo fue enviado automáticamente por BarberAI.
-                    </p>
-                  </div>
-                `,
-              });
-
-            if (error) {
-              console.error(
-                "❌ Error de Resend:",
-                error
-              );
-            } else {
-              console.log(
-                "📧 Email de confirmación enviado:",
-                data?.id
-              );
-            }
-          }
-        } catch (emailError) {
-          /*
-           * IMPORTANTE:
-           * Si Resend falla, NO eliminamos
-           * la cita.
-           */
-          console.error(
-            "❌ No se pudo enviar el email de confirmación:",
-            emailError
-          );
-        }
-      } else {
-        console.log(
-          "ℹ️ El cliente no tiene email. No se envió confirmación."
-        );
-      }
-
-      // ===================================================
-      // RESPUESTA
-      // ===================================================
-
-      return NextResponse.json(
-        {
-          success: true,
-          appointment,
-        },
-        {
-          status: 201,
-        }
-      );
     } catch (error) {
       if (
         isPrismaUniqueConstraintError(
@@ -1403,6 +1314,198 @@ Este correo fue enviado automáticamente por BarberAI.`,
 
       throw error;
     }
+
+    console.log(
+      "✅ Cita creada:",
+      appointment.id
+    );
+
+    // ===================================================
+    // GOOGLE CALENDAR — CREAR EVENTO
+    // ===================================================
+
+    if (
+      business.googleCalendarConnected &&
+      business.googleCalendarRefreshToken
+    ) {
+      try {
+        const googleEventId =
+          await createGoogleEvent({
+            refreshToken:
+              business.googleCalendarRefreshToken,
+
+            businessName:
+              business.name,
+
+            client,
+
+            service:
+              selectedService.name,
+
+            date,
+
+            time,
+          });
+
+        if (googleEventId) {
+          appointment =
+            await prisma.appointment.update({
+              where: {
+                id:
+                  appointment.id,
+              },
+
+              data: {
+                googleEventId,
+              },
+
+              include: {
+                clientRef: true,
+              },
+            });
+
+          console.log(
+            "✅ Evento creado y guardado:",
+            googleEventId
+          );
+        }
+      } catch (googleError) {
+        console.error(
+          "❌ Error creando evento de Google Calendar:",
+          googleError
+        );
+      }
+    }
+
+    // ===================================================
+    // EMAIL DE CONFIRMACIÓN
+    // ===================================================
+
+    if (
+      clientRecord.email &&
+      resend
+    ) {
+      try {
+        const formattedDate =
+          new Intl.DateTimeFormat(
+            "es-MX",
+            {
+              weekday:
+                "long",
+
+              day:
+                "numeric",
+
+              month:
+                "long",
+
+              year:
+                "numeric",
+            }
+          ).format(
+            new Date(
+              `${date}T12:00:00`
+            )
+          );
+
+        const { data, error } =
+          await resend.emails.send({
+            from:
+              "BarberAI <onboarding@resend.dev>",
+
+            to: [
+              clientRecord.email,
+            ],
+
+            subject:
+              `Confirmación de tu cita en ${business.name}`,
+
+            text:
+              `Hola ${clientRecord.name},\n\n` +
+              `Tu cita ha sido confirmada correctamente.\n\n` +
+              `Negocio: ${business.name}\n` +
+              `Servicio: ${selectedService.name}\n` +
+              `Fecha: ${formattedDate}\n` +
+              `Hora: ${time}\n\n` +
+              `Te esperamos. ✂️\n\n` +
+              `Este correo fue enviado automáticamente por BarberAI.`,
+
+            html: `
+              <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                <h2>¡Cita confirmada! ✂️</h2>
+
+                <p>Hola ${clientRecord.name},</p>
+
+                <p>
+                  Tu cita ha sido confirmada correctamente.
+                </p>
+
+                <div style="
+                  margin: 24px 0;
+                  padding: 20px;
+                  border: 1px solid #e5e5e5;
+                  border-radius: 12px;
+                ">
+                  <p>
+                    <strong>Negocio:</strong>
+                    ${business.name}
+                  </p>
+
+                  <p>
+                    <strong>Servicio:</strong>
+                    ${selectedService.name}
+                  </p>
+
+                  <p>
+                    <strong>Fecha:</strong>
+                    ${formattedDate}
+                  </p>
+
+                  <p>
+                    <strong>Hora:</strong>
+                    ${time}
+                  </p>
+                </div>
+
+                <p>
+                  Te esperamos. ✂️
+                </p>
+
+                <p style="color: #777; font-size: 12px;">
+                  Este correo fue enviado automáticamente por BarberAI.
+                </p>
+              </div>
+            `,
+          });
+
+        if (error) {
+          console.error(
+            "❌ Error de Resend:",
+            error
+          );
+        } else {
+          console.log(
+            "📧 Email de confirmación enviado:",
+            data?.id
+          );
+        }
+      } catch (emailError) {
+        console.error(
+          "❌ Error enviando confirmación:",
+          emailError
+        );
+      }
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        appointment,
+      },
+      {
+        status: 201,
+      }
+    );
   } catch (error) {
     console.error(
       "❌ Error creando cita:",
@@ -1422,23 +1525,21 @@ Este correo fue enviado automáticamente por BarberAI.`,
 }
 
 // =====================================================
-// DELETE — ELIMINAR CITA
+// DELETE — CANCELAR CITA
 // =====================================================
 
 export async function DELETE(
   request: Request
 ) {
   try {
-    // ===================================================
-    // AUTENTICACIÓN
-    // ===================================================
-
-    const userId = await getSessionUserId();
+    const userId =
+      await getSessionUserId();
 
     if (!userId) {
       return NextResponse.json(
         {
-          error: "No hay una sesión activa.",
+          error:
+            "No hay una sesión activa.",
         },
         {
           status: 401,
@@ -1446,24 +1547,25 @@ export async function DELETE(
       );
     }
 
-    // ===================================================
-    // BUSCAR NEGOCIO
-    // ===================================================
+    const business =
+      await prisma.business.findUnique({
+        where: {
+          userId,
+        },
 
-    const business = await prisma.business.findUnique({
-      where: {
-        userId,
-      },
-      select: {
-        id: true,
-        name: true,
-      },
-    });
+        select: {
+          id: true,
+          name: true,
+          googleCalendarConnected: true,
+          googleCalendarRefreshToken: true,
+        },
+      });
 
     if (!business) {
       return NextResponse.json(
         {
-          error: "No tienes un negocio configurado.",
+          error:
+            "No tienes un negocio configurado.",
         },
         {
           status: 404,
@@ -1471,18 +1573,20 @@ export async function DELETE(
       );
     }
 
-    // ===================================================
-    // LEER ID
-    // ===================================================
+    const body =
+      await request.json();
 
-    const body = await request.json();
+    const id =
+      Number(body.id);
 
-    const id = Number(body.id);
-
-    if (!Number.isSafeInteger(id) || id <= 0) {
+    if (
+      !Number.isSafeInteger(id) ||
+      id <= 0
+    ) {
       return NextResponse.json(
         {
-          error: "ID de cita inválido.",
+          error:
+            "ID de cita inválido.",
         },
         {
           status: 400,
@@ -1490,19 +1594,19 @@ export async function DELETE(
       );
     }
 
-    // ===================================================
-    // BUSCAR CITA + CLIENTE
-    // ===================================================
+    const appointment =
+      await prisma.appointment.findFirst({
+        where: {
+          id,
 
-    const appointment = await prisma.appointment.findFirst({
-      where: {
-        id,
-        businessId: business.id,
-      },
-      include: {
-        clientRef: true,
-      },
-    });
+          businessId:
+            business.id,
+        },
+
+        include: {
+          clientRef: true,
+        },
+      });
 
     if (!appointment) {
       return NextResponse.json(
@@ -1516,26 +1620,43 @@ export async function DELETE(
       );
     }
 
-    // ===================================================
-    // GUARDAR DATOS PARA EL EMAIL
-    // ===================================================
-
     const clientName =
       appointment.clientRef?.name ||
       appointment.client ||
       "Cliente";
 
     const clientEmail =
-      appointment.clientRef?.email || "";
+      appointment.clientRef?.email ||
+      "";
 
-    const appointmentService =
-      appointment.service;
+    // ===================================================
+    // GOOGLE CALENDAR — ELIMINAR EVENTO
+    // ===================================================
 
-    const appointmentDate =
-      appointment.date;
+    if (
+      business.googleCalendarConnected &&
+      business.googleCalendarRefreshToken &&
+      appointment.googleEventId
+    ) {
+      try {
+        await deleteGoogleEvent({
+          refreshToken:
+            business.googleCalendarRefreshToken,
 
-    const appointmentTime =
-      appointment.time;
+          eventId:
+            appointment.googleEventId,
+        });
+
+        console.log(
+          "✅ Evento eliminado de Google Calendar."
+        );
+      } catch (googleError) {
+        console.error(
+          "❌ Error eliminando evento de Google Calendar:",
+          googleError
+        );
+      }
+    }
 
     // ===================================================
     // ELIMINAR CITA
@@ -1543,144 +1664,74 @@ export async function DELETE(
 
     await prisma.appointment.delete({
       where: {
-        id: appointment.id,
+        id:
+          appointment.id,
       },
     });
 
     console.log(
       "🗑️ Cita eliminada:",
-      {
-        businessId: business.id,
-        appointmentId: appointment.id,
-      }
+      appointment.id
     );
 
     // ===================================================
     // EMAIL DE CANCELACIÓN
     // ===================================================
 
-    if (clientEmail) {
+    if (
+      clientEmail &&
+      resend
+    ) {
       try {
-        const resendApiKey =
-          process.env.RESEND_API_KEY;
+        const formattedDate =
+          new Intl.DateTimeFormat(
+            "es-MX",
+            {
+              weekday:
+                "long",
 
-        if (!resendApiKey) {
-          console.error(
-            "❌ Resend: falta RESEND_API_KEY."
+              day:
+                "numeric",
+
+              month:
+                "long",
+
+              year:
+                "numeric",
+            }
+          ).format(
+            new Date(
+              `${appointment.date}T12:00:00`
+            )
           );
-        } else {
-          const formattedDate =
-            new Intl.DateTimeFormat(
-              "es-MX",
-              {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              }
-            ).format(
-              new Date(
-                `${appointmentDate}T12:00:00`
-              )
-            );
 
-          const { data, error } =
-            await resend.emails.send({
-              from:
-                "BarberAI <onboarding@resend.dev>",
+        await resend.emails.send({
+          from:
+            "BarberAI <onboarding@resend.dev>",
 
-              to: [clientEmail],
+          to: [
+            clientEmail,
+          ],
 
-              subject:
-                `Cancelación de tu cita en ${business.name}`,
+          subject:
+            `Cancelación de tu cita en ${business.name}`,
 
-              text: [
-                `Hola ${clientName},`,
-                "",
-                `Tu cita en ${business.name} ha sido cancelada.`,
-                "",
-                `Servicio: ${appointmentService}`,
-                `Fecha: ${formattedDate}`,
-                `Hora: ${appointmentTime}`,
-                "",
-                "Si deseas reservar otra cita, puedes hacerlo nuevamente.",
-                "",
-                "Este correo fue enviado automáticamente por BarberAI.",
-              ].join("\n"),
-
-              html: `
-                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
-                  <h2>❌ Cita cancelada</h2>
-
-                  <p>
-                    Hola ${clientName},
-                  </p>
-
-                  <p>
-                    Tu cita en <strong>${business.name}</strong> ha sido cancelada.
-                  </p>
-
-                  <div style="
-                    margin: 24px 0;
-                    padding: 20px;
-                    border: 1px solid #e5e5e5;
-                    border-radius: 12px;
-                  ">
-                    <p>
-                      <strong>Servicio:</strong>
-                      ${appointmentService}
-                    </p>
-
-                    <p>
-                      <strong>Fecha:</strong>
-                      ${formattedDate}
-                    </p>
-
-                    <p>
-                      <strong>Hora:</strong>
-                      ${appointmentTime}
-                    </p>
-                  </div>
-
-                  <p>
-                    Si deseas reservar otra cita,
-                    puedes hacerlo nuevamente.
-                  </p>
-
-                  <p style="color: #777; font-size: 12px;">
-                    Este correo fue enviado automáticamente por BarberAI.
-                  </p>
-                </div>
-              `,
-            });
-
-          if (error) {
-            console.error(
-              "❌ Error de Resend al enviar cancelación:",
-              error
-            );
-          } else {
-            console.log(
-              "📧 Email de cancelación enviado:",
-              data?.id
-            );
-          }
-        }
+          text:
+            `Hola ${clientName},\n\n` +
+            `Tu cita en ${business.name} ha sido cancelada.\n\n` +
+            `Servicio: ${appointment.service}\n` +
+            `Fecha: ${formattedDate}\n` +
+            `Hora: ${appointment.time}\n\n` +
+            `Si deseas reservar otra cita, puedes hacerlo nuevamente.\n\n` +
+            `Este correo fue enviado automáticamente por BarberAI.`,
+        });
       } catch (emailError) {
         console.error(
-          "❌ No se pudo enviar el email de cancelación:",
+          "❌ Error enviando cancelación:",
           emailError
         );
       }
-    } else {
-      console.log(
-        "ℹ️ El cliente no tiene email. No se envió cancelación."
-      );
     }
-
-    // ===================================================
-    // RESPUESTA
-    // ===================================================
 
     return NextResponse.json({
       success: true,
@@ -1693,7 +1744,8 @@ export async function DELETE(
 
     return NextResponse.json(
       {
-        error: "No se pudo eliminar la cita.",
+        error:
+          "No se pudo eliminar la cita.",
       },
       {
         status: 500,
@@ -1701,6 +1753,7 @@ export async function DELETE(
     );
   }
 }
+
 // =====================================================
 // PUT — REPROGRAMAR CITA
 // =====================================================
@@ -1709,87 +1762,128 @@ export async function PUT(
   request: Request
 ) {
   try {
-    // ===================================================
-    // AUTENTICACIÓN
-    // ===================================================
-
-    const userId = await getSessionUserId();
+    const userId =
+      await getSessionUserId();
 
     if (!userId) {
       return NextResponse.json(
-        { error: "No hay una sesión activa." },
-        { status: 401 }
+        {
+          error:
+            "No hay una sesión activa.",
+        },
+        {
+          status: 401,
+        }
       );
     }
 
-    // ===================================================
-    // BUSCAR NEGOCIO
-    // ===================================================
+    const business =
+      await prisma.business.findUnique({
+        where: {
+          userId,
+        },
 
-    const business = await prisma.business.findUnique({
-      where: { userId },
-      select: {
-        id: true,
-        name: true,
-        hours: true,
-      },
-    });
+        select: {
+          id: true,
+          name: true,
+          hours: true,
+          googleCalendarConnected: true,
+          googleCalendarRefreshToken: true,
+        },
+      });
 
     if (!business) {
       return NextResponse.json(
-        { error: "No tienes un negocio configurado." },
-        { status: 404 }
+        {
+          error:
+            "No tienes un negocio configurado.",
+        },
+        {
+          status: 404,
+        }
       );
     }
 
-    // ===================================================
-    // LEER DATOS
-    // ===================================================
+    const body =
+      await request.json();
 
-    const body = await request.json();
+    const id =
+      Number(body.id);
 
-    const id = Number(body.id);
-    const newDate = String(body.date ?? "").trim();
-    const newTime = String(body.time ?? "").trim();
+    const newDate =
+      String(
+        body.date ?? ""
+      ).trim();
 
-    if (!Number.isSafeInteger(id) || id <= 0) {
+    const newTime =
+      String(
+        body.time ?? ""
+      ).trim();
+
+    if (
+      !Number.isSafeInteger(id) ||
+      id <= 0
+    ) {
       return NextResponse.json(
-        { error: "ID de cita inválido." },
-        { status: 400 }
+        {
+          error:
+            "ID de cita inválido.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
-    // ===================================================
-    // VALIDAR FECHA Y HORA
-    // ===================================================
-
-    if (!isValidDateFormat(newDate)) {
+    if (
+      !isValidDateFormat(
+        newDate
+      )
+    ) {
       return NextResponse.json(
-        { error: "La nueva fecha no es válida." },
-        { status: 400 }
+        {
+          error:
+            "La nueva fecha no es válida.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
-    if (!isValidTimeFormat(newTime)) {
+    if (
+      !isValidTimeFormat(
+        newTime
+      )
+    ) {
       return NextResponse.json(
-        { error: "La nueva hora no es válida." },
-        { status: 400 }
+        {
+          error:
+            "La nueva hora no es válida.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
     // ===================================================
-    // BUSCAR CITA + CLIENTE
+    // BUSCAR CITA
     // ===================================================
 
-    const appointment = await prisma.appointment.findFirst({
-      where: {
-        id,
-        businessId: business.id,
-      },
-      include: {
-        clientRef: true,
-      },
-    });
+    const appointment =
+      await prisma.appointment.findFirst({
+        where: {
+          id,
+
+          businessId:
+            business.id,
+        },
+
+        include: {
+          clientRef: true,
+        },
+      });
 
     if (!appointment) {
       return NextResponse.json(
@@ -1797,16 +1891,17 @@ export async function PUT(
           error:
             "La cita no existe o no pertenece a tu negocio.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
-    // ===================================================
-    // GUARDAR DATOS ANTERIORES
-    // ===================================================
+    const oldDate =
+      appointment.date;
 
-    const oldDate = appointment.date;
-    const oldTime = appointment.time;
+    const oldTime =
+      appointment.time;
 
     const clientName =
       appointment.clientRef?.name ||
@@ -1814,22 +1909,28 @@ export async function PUT(
       "Cliente";
 
     const clientEmail =
-      appointment.clientRef?.email || "";
-
-    const appointmentService = appointment.service;
+      appointment.clientRef?.email ||
+      "";
 
     // ===================================================
-    // COMPROBAR NUEVO HORARIO DISPONIBLE
+    // COMPROBAR DISPONIBILIDAD
     // ===================================================
 
     const existingAppointment =
       await prisma.appointment.findFirst({
         where: {
-          businessId: business.id,
-          date: newDate,
-          time: newTime,
+          businessId:
+            business.id,
+
+          date:
+            newDate,
+
+          time:
+            newTime,
+
           NOT: {
-            id: appointment.id,
+            id:
+              appointment.id,
           },
         },
       });
@@ -1839,17 +1940,24 @@ export async function PUT(
         {
           error:
             `El horario del ${newDate} a las ${newTime} ya está ocupado.`,
-          code: "APPOINTMENT_SLOT_TAKEN",
+
+          code:
+            "APPOINTMENT_SLOT_TAKEN",
         },
-        { status: 409 }
+        {
+          status: 409,
+        }
       );
     }
 
     // ===================================================
-    // VALIDAR HORARIO DEL NEGOCIO
+    // VALIDAR HORARIO
     // ===================================================
 
-    const hours = parseHours(business.hours);
+    const hours =
+      parseHours(
+        business.hours
+      );
 
     if (!hours) {
       return NextResponse.json(
@@ -1857,20 +1965,29 @@ export async function PUT(
           error:
             "El horario guardado del negocio no se puede leer.",
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
-    const dayName = getDayName(newDate);
+    const dayName =
+      getDayName(newDate);
 
     if (!dayName) {
       return NextResponse.json(
-        { error: "La nueva fecha no es válida." },
-        { status: 400 }
+        {
+          error:
+            "La nueva fecha no es válida.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
-    const dayHours = hours[dayName];
+    const dayHours =
+      hours[dayName];
 
     if (!dayHours) {
       return NextResponse.json(
@@ -1878,88 +1995,146 @@ export async function PUT(
           error:
             "No hay un horario configurado para ese día.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     if (dayHours.closed) {
       return NextResponse.json(
-        { error: "El negocio está cerrado ese día." },
-        { status: 400 }
+        {
+          error:
+            "El negocio está cerrado ese día.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
-    const openingTime = String(dayHours.open || "").trim();
-    const closingTime = String(dayHours.close || "").trim();
+    const openingTime =
+      String(
+        dayHours.open || ""
+      ).trim();
+
+    const closingTime =
+      String(
+        dayHours.close || ""
+      ).trim();
 
     if (
-      !isValidTimeFormat(openingTime) ||
-      !isValidTimeFormat(closingTime)
+      !isValidTimeFormat(
+        openingTime
+      ) ||
+      !isValidTimeFormat(
+        closingTime
+      )
     ) {
       return NextResponse.json(
         {
           error:
             "El horario de ese día no está configurado correctamente.",
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
-    const openingMinutes = timeToMinutes(openingTime);
-    const closingMinutes = timeToMinutes(closingTime);
-    const newTimeMinutes = timeToMinutes(newTime);
+    const openingMinutes =
+      timeToMinutes(
+        openingTime
+      );
 
-    if (closingMinutes <= openingMinutes) {
+    const closingMinutes =
+      timeToMinutes(
+        closingTime
+      );
+
+    const newTimeMinutes =
+      timeToMinutes(
+        newTime
+      );
+
+    if (
+      closingMinutes <=
+      openingMinutes
+    ) {
       return NextResponse.json(
         {
           error:
             "El horario de apertura y cierre del negocio no es válido.",
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
     if (
-      newTimeMinutes < openingMinutes ||
-      newTimeMinutes >= closingMinutes
+      newTimeMinutes <
+        openingMinutes ||
+      newTimeMinutes >=
+        closingMinutes
     ) {
       return NextResponse.json(
         {
           error:
             `El horario seleccionado (${newTime}) está fuera del horario del negocio (${openingTime} - ${closingTime}).`,
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     // ===================================================
-    // ACTUALIZAR CITA
+    // ACTUALIZAR CITA EN DATABASE
     // ===================================================
 
     let updatedAppointment;
 
     try {
-      updatedAppointment = await prisma.appointment.update({
-        where: {
-          id: appointment.id,
-        },
-        data: {
-          date: newDate,
-          time: newTime,
-        },
-        include: {
-          clientRef: true,
-        },
-      });
+      updatedAppointment =
+        await prisma.appointment.update({
+          where: {
+            id:
+              appointment.id,
+          },
+
+          data: {
+            date:
+              newDate,
+
+            time:
+              newTime,
+
+            reminderSentAt:
+              null,
+          },
+
+          include: {
+            clientRef: true,
+          },
+        });
     } catch (error) {
-      if (isPrismaUniqueConstraintError(error)) {
+      if (
+        isPrismaUniqueConstraintError(
+          error
+        )
+      ) {
         return NextResponse.json(
           {
             error:
               `El horario del ${newDate} a las ${newTime} acaba de ser ocupado por otra cita.`,
-            code: "APPOINTMENT_SLOT_TAKEN",
+
+            code:
+              "APPOINTMENT_SLOT_TAKEN",
           },
-          { status: 409 }
+          {
+            status: 409,
+          }
         );
       }
 
@@ -1969,167 +2144,250 @@ export async function PUT(
     console.log(
       "🔄 Cita reprogramada:",
       {
-        businessId: business.id,
-        appointmentId: appointment.id,
+        appointmentId:
+          appointment.id,
+
         oldDate,
+
         oldTime,
+
         newDate,
+
         newTime,
       }
     );
 
     // ===================================================
-    // EMAIL DE REPROGRAMACIÓN
+    // GOOGLE CALENDAR — ACTUALIZAR EVENTO
     // ===================================================
 
-    if (clientEmail) {
+    if (
+      business.googleCalendarConnected &&
+      business.googleCalendarRefreshToken
+    ) {
       try {
-        const resendApiKey = process.env.RESEND_API_KEY;
+        let googleEventId =
+          appointment.googleEventId;
 
-        if (!resendApiKey) {
-          console.error(
-            "❌ Resend: falta RESEND_API_KEY."
-          );
-        } else {
-          const oldFormattedDate =
-            new Intl.DateTimeFormat("es-MX", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            }).format(
-              new Date(`${oldDate}T12:00:00`)
-            );
+        // Si la cita ya tenía evento,
+        // lo actualizamos.
+        if (googleEventId) {
+          try {
+            await updateGoogleEvent({
+              refreshToken:
+                business.googleCalendarRefreshToken,
 
-          const newFormattedDate =
-            new Intl.DateTimeFormat("es-MX", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            }).format(
-              new Date(`${newDate}T12:00:00`)
-            );
+              eventId:
+                googleEventId,
 
-          const { data, error } =
-            await resend.emails.send({
-              from:
-                "BarberAI <onboarding@resend.dev>",
+              businessName:
+                business.name,
 
-              to: [clientEmail],
+              client:
+                clientName,
 
-              subject:
-                `Tu cita fue reprogramada en ${business.name}`,
+              service:
+                appointment.service,
 
-              text: [
-                `Hola ${clientName},`,
-                "",
-                `Tu cita en ${business.name} ha sido reprogramada.`,
-                "",
-                `Servicio: ${appointmentService}`,
-                "",
-                `Fecha anterior: ${oldFormattedDate}`,
-                `Hora anterior: ${oldTime}`,
-                "",
-                `Nueva fecha: ${newFormattedDate}`,
-                `Nueva hora: ${newTime}`,
-                "",
-                "Te esperamos. ✂️",
-                "",
-                "Este correo fue enviado automáticamente por BarberAI.",
-              ].join("\n"),
+              date:
+                newDate,
 
-              html: `
-                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
-                  <h2>🔄 Cita reprogramada</h2>
-
-                  <p>
-                    Hola ${clientName},
-                  </p>
-
-                  <p>
-                    Tu cita en <strong>${business.name}</strong>
-                    ha sido reprogramada.
-                  </p>
-
-                  <div style="
-                    margin: 24px 0;
-                    padding: 20px;
-                    border: 1px solid #e5e5e5;
-                    border-radius: 12px;
-                  ">
-                    <p>
-                      <strong>Servicio:</strong>
-                      ${appointmentService}
-                    </p>
-
-                    <hr style="border: 0; border-top: 1px solid #eee;" />
-
-                    <p>
-                      <strong>Fecha anterior:</strong>
-                      ${oldFormattedDate}
-                    </p>
-
-                    <p>
-                      <strong>Hora anterior:</strong>
-                      ${oldTime}
-                    </p>
-
-                    <hr style="border: 0; border-top: 1px solid #eee;" />
-
-                    <p>
-                      <strong>Nueva fecha:</strong>
-                      ${newFormattedDate}
-                    </p>
-
-                    <p>
-                      <strong>Nueva hora:</strong>
-                      ${newTime}
-                    </p>
-                  </div>
-
-                  <p>
-                    Te esperamos. ✂️
-                  </p>
-
-                  <p style="color: #777; font-size: 12px;">
-                    Este correo fue enviado automáticamente por BarberAI.
-                  </p>
-                </div>
-              `,
+              time:
+                newTime,
             });
 
-          if (error) {
-            console.error(
-              "❌ Error de Resend al enviar reprogramación:",
-              error
-            );
-          } else {
             console.log(
-              "📧 Email de reprogramación enviado:",
-              data?.id
+              "✅ Evento actualizado en Google Calendar."
+            );
+          } catch (googleUpdateError: any) {
+            const status =
+              googleUpdateError?.response?.status;
+
+            // Si el evento fue eliminado
+            // manualmente de Google,
+            // creamos uno nuevo.
+            if (
+              status === 404 ||
+              status === 410
+            ) {
+              console.log(
+                "ℹ️ El evento anterior ya no existe. Creando uno nuevo..."
+              );
+
+              googleEventId =
+                await createGoogleEvent({
+                  refreshToken:
+                    business.googleCalendarRefreshToken,
+
+                  businessName:
+                    business.name,
+
+                  client:
+                    clientName,
+
+                  service:
+                    appointment.service,
+
+                  date:
+                    newDate,
+
+                  time:
+                    newTime,
+                });
+
+              if (googleEventId) {
+                await prisma.appointment.update({
+                  where: {
+                    id:
+                      appointment.id,
+                  },
+
+                  data: {
+                    googleEventId,
+                  },
+                });
+              }
+            } else {
+              throw googleUpdateError;
+            }
+          }
+        } else {
+          // Si por alguna razón la cita no tenía
+          // googleEventId, creamos el evento.
+          googleEventId =
+            await createGoogleEvent({
+              refreshToken:
+                business.googleCalendarRefreshToken,
+
+              businessName:
+                business.name,
+
+              client:
+                clientName,
+
+              service:
+                appointment.service,
+
+              date:
+                newDate,
+
+              time:
+                newTime,
+            });
+
+          if (googleEventId) {
+            await prisma.appointment.update({
+              where: {
+                id:
+                  appointment.id,
+              },
+
+              data: {
+                googleEventId,
+              },
+            });
+
+            console.log(
+              "✅ Evento de Google creado para cita existente."
             );
           }
         }
-      } catch (emailError) {
+      } catch (googleError) {
         console.error(
-          "❌ No se pudo enviar el email de reprogramación:",
-          emailError
+          "❌ Error sincronizando reprogramación con Google Calendar:",
+          googleError
         );
       }
-    } else {
-      console.log(
-        "ℹ️ El cliente no tiene email. No se envió reprogramación."
-      );
     }
 
     // ===================================================
-    // RESPUESTA
+    // EMAIL DE REPROGRAMACIÓN
     // ===================================================
+
+    if (
+      clientEmail &&
+      resend
+    ) {
+      try {
+        const oldFormattedDate =
+          new Intl.DateTimeFormat(
+            "es-MX",
+            {
+              weekday:
+                "long",
+
+              day:
+                "numeric",
+
+              month:
+                "long",
+
+              year:
+                "numeric",
+            }
+          ).format(
+            new Date(
+              `${oldDate}T12:00:00`
+            )
+          );
+
+        const newFormattedDate =
+          new Intl.DateTimeFormat(
+            "es-MX",
+            {
+              weekday:
+                "long",
+
+              day:
+                "numeric",
+
+              month:
+                "long",
+
+              year:
+                "numeric",
+            }
+          ).format(
+            new Date(
+              `${newDate}T12:00:00`
+            )
+          );
+
+        await resend.emails.send({
+          from:
+            "BarberAI <onboarding@resend.dev>",
+
+          to: [
+            clientEmail,
+          ],
+
+          subject:
+            `Tu cita fue reprogramada en ${business.name}`,
+
+          text:
+            `Hola ${clientName},\n\n` +
+            `Tu cita en ${business.name} ha sido reprogramada.\n\n` +
+            `Servicio: ${appointment.service}\n\n` +
+            `Fecha anterior: ${oldFormattedDate}\n` +
+            `Hora anterior: ${oldTime}\n\n` +
+            `Nueva fecha: ${newFormattedDate}\n` +
+            `Nueva hora: ${newTime}\n\n` +
+            `Te esperamos. ✂️\n\n` +
+            `Este correo fue enviado automáticamente por BarberAI.`,
+        });
+      } catch (emailError) {
+        console.error(
+          "❌ Error enviando reprogramación:",
+          emailError
+        );
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      appointment: updatedAppointment,
+
+      appointment:
+        updatedAppointment,
     });
   } catch (error) {
     console.error(
@@ -2142,7 +2400,9 @@ export async function PUT(
         error:
           "No se pudo reprogramar la cita.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
