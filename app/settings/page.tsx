@@ -25,6 +25,8 @@ type Business = {
   aiCanBook: boolean;
   aiCanCancel: boolean;
   aiCanReschedule: boolean;
+
+  googleCalendarConnected?: boolean;
 };
 
 const planNames = {
@@ -66,6 +68,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [openingPortal, setOpeningPortal] =
+    useState(false);
+
+  const [connectingGoogle, setConnectingGoogle] =
     useState(false);
 
   const [message, setMessage] = useState("");
@@ -662,6 +667,53 @@ Domingo: cerrado`}
           </div>
 
         </form>
+
+        {/* GOOGLE CALENDAR */}
+
+        {business && (
+          <section className="mt-10 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">
+                  📅 Google Calendar
+                </h2>
+
+                <p className="mt-2 max-w-xl text-sm text-gray-500">
+                  Sincroniza automáticamente las citas de BarberAI
+                  con tu Google Calendar.
+                </p>
+
+                <div className="mt-4">
+                  {business.googleCalendarConnected ? (
+                    <span className="inline-flex items-center rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-sm text-green-400">
+                      🟢 Google Calendar conectado
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full border border-white/10 bg-black px-3 py-1 text-sm text-gray-400">
+                      ⚪ Google Calendar no conectado
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={connectingGoogle}
+                onClick={() => {
+                  setConnectingGoogle(true);
+                  window.location.href = "/api/google/auth";
+                }}
+                className="shrink-0 rounded-xl bg-white px-6 py-3 font-semibold text-black transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {connectingGoogle
+                  ? "Conectando..."
+                  : business.googleCalendarConnected
+                    ? "Volver a conectar"
+                    : "Conectar Google Calendar"}
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* SUSCRIPCIÓN */}
 
