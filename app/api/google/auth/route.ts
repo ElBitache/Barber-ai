@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -15,8 +15,13 @@ export async function GET() {
       );
     }
 
-    const redirectUri =
-      "http://localhost:3000/api/google/callback";
+    // Detecta automáticamente si estamos en local o en producción
+    const redirectUri = new URL(
+      "/api/google/callback",
+      req.url
+    ).toString();
+
+    console.log("🔐 Google OAuth redirect URI:", redirectUri);
 
     const oauth2Client = new google.auth.OAuth2(
       clientId,
@@ -38,7 +43,8 @@ export async function GET() {
 
     return Response.json(
       {
-        error: "No se pudo iniciar la conexión con Google Calendar.",
+        error:
+          "No se pudo iniciar la conexión con Google Calendar.",
       },
       { status: 500 }
     );
