@@ -14,22 +14,16 @@ const MAX_AI_WELCOME_LENGTH = 1000;
 
 const DEFAULT_AI_NAME = "Empleado IA";
 
-const DEFAULT_AI_PERSONALITY =
-  "amigable";
+const DEFAULT_AI_PERSONALITY = "amigable";
 
 const DEFAULT_AI_WELCOME =
   "¡Hola! 👋 Soy el empleado de IA de tu negocio. ¿En qué puedo ayudarte?";
 
-function cleanText(
-  value: unknown
-) {
+function cleanText(value: unknown) {
   return String(value ?? "").trim();
 }
 
-function isTooLong(
-  value: string,
-  maxLength: number
-) {
+function isTooLong(value: string, maxLength: number) {
   return value.length > maxLength;
 }
 
@@ -39,14 +33,12 @@ function isTooLong(
 
 export async function GET() {
   try {
-    const userId =
-      await getSessionUserId();
+    const userId = await getSessionUserId();
 
     if (!userId) {
       return NextResponse.json(
         {
-          error:
-            "No hay una sesión activa.",
+          error: "No hay una sesión activa.",
         },
         {
           status: 401,
@@ -54,66 +46,57 @@ export async function GET() {
       );
     }
 
-    const business =
-      await prisma.business.findUnique({
-        where: {
-          userId,
-        },
+    const business = await prisma.business.findUnique({
+      where: {
+        userId,
+      },
 
-        select: {
-          id: true,
+      select: {
+        id: true,
 
-          name: true,
+        name: true,
 
-          description: true,
+        description: true,
 
-          services: true,
+        services: true,
 
-          hours: true,
+        hours: true,
 
-          createdAt: true,
+        createdAt: true,
 
-          plan: true,
+        plan: true,
 
-          subscriptionStatus:
-            true,
+        subscriptionStatus: true,
 
-          trialStartedAt:
-            true,
+        trialStartedAt: true,
 
-          trialEndsAt:
-            true,
+        trialEndsAt: true,
 
-          subscriptionStartedAt:
-            true,
+        subscriptionStartedAt: true,
 
-          subscriptionEndsAt:
-            true,
+        subscriptionEndsAt: true,
 
-          aiName: true,
+        aiName: true,
 
-          aiPersonality:
-            true,
+        aiPersonality: true,
 
-          aiWelcome:
-            true,
+        aiWelcome: true,
 
-          aiCanBook:
-            true,
+        aiCanBook: true,
 
-          aiCanCancel:
-            true,
+        aiCanCancel: true,
 
-          aiCanReschedule:
-            true,
-        },
-      });
+        aiCanReschedule: true,
+
+        // Google Calendar
+        googleCalendarConnected: true,
+      },
+    });
 
     if (!business) {
       return NextResponse.json(
         {
-          error:
-            "No tienes un negocio configurado.",
+          error: "No tienes un negocio configurado.",
         },
         {
           status: 404,
@@ -126,25 +109,22 @@ export async function GET() {
      *
      * stripeCustomerId
      * stripeSubscriptionId
+     * googleCalendarRefreshToken
      *
      * al navegador.
      *
-     * Son datos internos del servidor.
+     * Son datos internos y/o secretos del servidor.
      */
 
     return NextResponse.json({
       business,
     });
   } catch (error) {
-    console.error(
-      "❌ Error obteniendo negocio:",
-      error
-    );
+    console.error("❌ Error obteniendo negocio:", error);
 
     return NextResponse.json(
       {
-        error:
-          "No se pudo obtener el negocio.",
+        error: "No se pudo obtener el negocio.",
       },
       {
         status: 500,
@@ -157,22 +137,18 @@ export async function GET() {
 // POST — CREAR / ACTUALIZAR NEGOCIO
 // =====================================================
 
-export async function POST(
-  request: Request
-) {
+export async function POST(request: Request) {
   try {
     // ===================================================
     // AUTENTICACIÓN
     // ===================================================
 
-    const userId =
-      await getSessionUserId();
+    const userId = await getSessionUserId();
 
     if (!userId) {
       return NextResponse.json(
         {
-          error:
-            "No hay una sesión activa.",
+          error: "No hay una sesión activa.",
         },
         {
           status: 401,
@@ -187,13 +163,11 @@ export async function POST(
     let body: unknown;
 
     try {
-      body =
-        await request.json();
+      body = await request.json();
     } catch {
       return NextResponse.json(
         {
-          error:
-            "El cuerpo de la solicitud no es válido.",
+          error: "El cuerpo de la solicitud no es válido.",
         },
         {
           status: 400,
@@ -201,14 +175,10 @@ export async function POST(
       );
     }
 
-    if (
-      !body ||
-      typeof body !== "object"
-    ) {
+    if (!body || typeof body !== "object") {
       return NextResponse.json(
         {
-          error:
-            "Los datos enviados no son válidos.",
+          error: "Los datos enviados no son válidos.",
         },
         {
           status: 400,
@@ -216,70 +186,47 @@ export async function POST(
       );
     }
 
-    const data =
-      body as Record<
-        string,
-        unknown
-      >;
+    const data = body as Record<string, unknown>;
 
     // ===================================================
     // DATOS DEL NEGOCIO
     // ===================================================
 
-    const name =
-      cleanText(data.name);
+    const name = cleanText(data.name);
 
-    const description =
-      cleanText(
-        data.description
-      );
+    const description = cleanText(data.description);
 
-    const services =
-      cleanText(
-        data.services
-      );
+    const services = cleanText(data.services);
 
-    const hours =
-      cleanText(
-        data.hours
-      );
+    const hours = cleanText(data.hours);
 
     // ===================================================
     // DATOS DEL EMPLEADO IA
     // ===================================================
 
     const aiName =
-      cleanText(
-        data.aiName
-      ) || DEFAULT_AI_NAME;
+      cleanText(data.aiName) || DEFAULT_AI_NAME;
 
     const aiPersonality =
-      cleanText(
-        data.aiPersonality
-      ) ||
+      cleanText(data.aiPersonality) ||
       DEFAULT_AI_PERSONALITY;
 
     const aiWelcome =
-      cleanText(
-        data.aiWelcome
-      ) ||
+      cleanText(data.aiWelcome) ||
       DEFAULT_AI_WELCOME;
 
     const aiCanBook =
-      typeof data.aiCanBook ===
-      "boolean"
+      typeof data.aiCanBook === "boolean"
         ? data.aiCanBook
         : true;
 
     const aiCanCancel =
-      typeof data.aiCanCancel ===
-      "boolean"
+      typeof data.aiCanCancel === "boolean"
         ? data.aiCanCancel
         : true;
 
     const aiCanReschedule =
-      typeof data.aiCanReschedule ===
-      "boolean"
+      typeof data.aiCanReschedule === "boolean"
         ? data.aiCanReschedule
         : true;
 
@@ -287,12 +234,7 @@ export async function POST(
     // CAMPOS OBLIGATORIOS
     // ===================================================
 
-    if (
-      !name ||
-      !description ||
-      !services ||
-      !hours
-    ) {
+    if (!name || !description || !services || !hours) {
       return NextResponse.json(
         {
           error:
@@ -308,16 +250,10 @@ export async function POST(
     // LÍMITES DE TEXTO
     // ===================================================
 
-    if (
-      isTooLong(
-        name,
-        MAX_NAME_LENGTH
-      )
-    ) {
+    if (isTooLong(name, MAX_NAME_LENGTH)) {
       return NextResponse.json(
         {
-          error:
-            `El nombre del negocio no puede superar los ${MAX_NAME_LENGTH} caracteres.`,
+          error: `El nombre del negocio no puede superar los ${MAX_NAME_LENGTH} caracteres.`,
         },
         {
           status: 400,
@@ -333,8 +269,7 @@ export async function POST(
     ) {
       return NextResponse.json(
         {
-          error:
-            `La descripción no puede superar los ${MAX_DESCRIPTION_LENGTH} caracteres.`,
+          error: `La descripción no puede superar los ${MAX_DESCRIPTION_LENGTH} caracteres.`,
         },
         {
           status: 400,
@@ -350,8 +285,7 @@ export async function POST(
     ) {
       return NextResponse.json(
         {
-          error:
-            `Los servicios no pueden superar los ${MAX_SERVICES_LENGTH} caracteres.`,
+          error: `Los servicios no pueden superar los ${MAX_SERVICES_LENGTH} caracteres.`,
         },
         {
           status: 400,
@@ -367,8 +301,7 @@ export async function POST(
     ) {
       return NextResponse.json(
         {
-          error:
-            `Los horarios no pueden superar los ${MAX_HOURS_LENGTH} caracteres.`,
+          error: `Los horarios no pueden superar los ${MAX_HOURS_LENGTH} caracteres.`,
         },
         {
           status: 400,
@@ -384,8 +317,7 @@ export async function POST(
     ) {
       return NextResponse.json(
         {
-          error:
-            `El nombre del empleado IA no puede superar los ${MAX_AI_NAME_LENGTH} caracteres.`,
+          error: `El nombre del empleado IA no puede superar los ${MAX_AI_NAME_LENGTH} caracteres.`,
         },
         {
           status: 400,
@@ -401,8 +333,7 @@ export async function POST(
     ) {
       return NextResponse.json(
         {
-          error:
-            `La personalidad de la IA no puede superar los ${MAX_AI_PERSONALITY_LENGTH} caracteres.`,
+          error: `La personalidad de la IA no puede superar los ${MAX_AI_PERSONALITY_LENGTH} caracteres.`,
         },
         {
           status: 400,
@@ -418,8 +349,7 @@ export async function POST(
     ) {
       return NextResponse.json(
         {
-          error:
-            `El mensaje de bienvenida no puede superar los ${MAX_AI_WELCOME_LENGTH} caracteres.`,
+          error: `El mensaje de bienvenida no puede superar los ${MAX_AI_WELCOME_LENGTH} caracteres.`,
         },
         {
           status: 400,
@@ -486,53 +416,43 @@ export async function POST(
 
             plan: true,
 
-            subscriptionStatus:
-              true,
+            subscriptionStatus: true,
 
-            trialStartedAt:
-              true,
+            trialStartedAt: true,
 
-            trialEndsAt:
-              true,
+            trialEndsAt: true,
 
-            subscriptionStartedAt:
-              true,
+            subscriptionStartedAt: true,
 
-            subscriptionEndsAt:
-              true,
+            subscriptionEndsAt: true,
 
             aiName: true,
 
-            aiPersonality:
-              true,
+            aiPersonality: true,
 
-            aiWelcome:
-              true,
+            aiWelcome: true,
 
-            aiCanBook:
-              true,
+            aiCanBook: true,
 
-            aiCanCancel:
-              true,
+            aiCanCancel: true,
 
-            aiCanReschedule:
-              true,
+            aiCanReschedule: true,
+
+            // Google Calendar
+            googleCalendarConnected: true,
           },
         });
 
       console.log(
         "✅ Negocio actualizado:",
         {
-          businessId:
-            business.id,
-
+          businessId: business.id,
           userId,
         }
       );
 
       return NextResponse.json({
         success: true,
-
         business,
       });
     }
@@ -541,13 +461,11 @@ export async function POST(
     // CREAR TRIAL DE 14 DÍAS
     // ===================================================
 
-    const trialStartedAt =
-      new Date();
+    const trialStartedAt = new Date();
 
-    const trialEndsAt =
-      new Date(
-        trialStartedAt
-      );
+    const trialEndsAt = new Date(
+      trialStartedAt
+    );
 
     trialEndsAt.setDate(
       trialEndsAt.getDate() +
@@ -559,110 +477,95 @@ export async function POST(
     // ===================================================
 
     const business =
-      await prisma.business.create(
-        {
-          data: {
-            name,
+      await prisma.business.create({
+        data: {
+          name,
 
-            description,
+          description,
 
-            services,
+          services,
 
-            hours,
+          hours,
 
-            userId,
+          userId,
 
-            plan: "FREE",
+          plan: "FREE",
 
-            subscriptionStatus:
-              "TRIALING",
+          subscriptionStatus:
+            "TRIALING",
 
-            trialStartedAt,
+          trialStartedAt,
 
-            trialEndsAt,
+          trialEndsAt,
 
-            aiName,
+          aiName,
 
-            aiPersonality,
+          aiPersonality,
 
-            aiWelcome,
+          aiWelcome,
 
-            aiCanBook,
+          aiCanBook,
 
-            aiCanCancel,
+          aiCanCancel,
 
-            aiCanReschedule,
-          },
+          aiCanReschedule,
+        },
 
-          select: {
-            id: true,
+        select: {
+          id: true,
 
-            name: true,
+          name: true,
 
-            description: true,
+          description: true,
 
-            services: true,
+          services: true,
 
-            hours: true,
+          hours: true,
 
-            createdAt: true,
+          createdAt: true,
 
-            plan: true,
+          plan: true,
 
-            subscriptionStatus:
-              true,
+          subscriptionStatus: true,
 
-            trialStartedAt:
-              true,
+          trialStartedAt: true,
 
-            trialEndsAt:
-              true,
+          trialEndsAt: true,
 
-            subscriptionStartedAt:
-              true,
+          subscriptionStartedAt: true,
 
-            subscriptionEndsAt:
-              true,
+          subscriptionEndsAt: true,
 
-            aiName: true,
+          aiName: true,
 
-            aiPersonality:
-              true,
+          aiPersonality: true,
 
-            aiWelcome:
-              true,
+          aiWelcome: true,
 
-            aiCanBook:
-              true,
+          aiCanBook: true,
 
-            aiCanCancel:
-              true,
+          aiCanCancel: true,
 
-            aiCanReschedule:
-              true,
-          },
-        }
-      );
+          aiCanReschedule: true,
+
+          // Google Calendar
+          googleCalendarConnected: true,
+        },
+      });
 
     console.log(
       "🎁 Trial creado:",
       {
-        businessId:
-          business.id,
-
+        businessId: business.id,
         userId,
-
         trialStartedAt,
-
         trialEndsAt,
-
         days: TRIAL_DAYS,
       }
     );
 
     return NextResponse.json({
       success: true,
-
       business,
     });
   } catch (error) {
