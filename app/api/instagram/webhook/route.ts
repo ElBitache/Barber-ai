@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const VERIFY_TOKEN = process.env.INSTAGRAM_VERIFY_TOKEN;
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
 const INSTAGRAM_ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
 
