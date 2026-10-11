@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -13,9 +14,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setError("");
@@ -37,14 +36,10 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(
-          data.error || "No se pudo crear la cuenta."
-        );
+        setError(data.error || "No se pudo crear la cuenta.");
         return;
       }
 
-      // Iniciar sesión automáticamente
-      // después de crear la cuenta.
       const loginResponse = await fetch("/api/login", {
         method: "POST",
         headers: {
@@ -66,19 +61,11 @@ export default function RegisterPage() {
         return;
       }
 
-      // Después del registro vamos a configurar
-      // el negocio del usuario.
       router.push("/onboarding");
       router.refresh();
     } catch (error) {
-      console.error(
-        "Error creando cuenta:",
-        error
-      );
-
-      setError(
-        "Ocurrió un error al crear la cuenta."
-      );
+      console.error("Error creando cuenta:", error);
+      setError("Ocurrió un error al crear la cuenta.");
     } finally {
       setLoading(false);
     }
@@ -86,14 +73,18 @@ export default function RegisterPage() {
 
   return (
     <main className="min-h-screen bg-black text-white">
-      <div className="mx-auto flex min-h-screen max-w-md items-center px-6 py-10">
+      <div className="mx-auto flex min-h-screen max-w-md items-center px-6 pt-16 pb-6">
         <div className="w-full">
-
-          {/* HEADER */}
-
           <div className="mb-8 text-center">
-            <div className="mb-4 inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300">
-              🤖 BarberAI
+            <div className="mb-5 flex justify-center">
+              <Image
+                src="/bizstaffia-logo.png"
+                alt="BizStaffIA"
+                width={240}
+                height={110}
+                priority
+                className="h-[110px] w-auto object-contain"
+              />
             </div>
 
             <h1 className="text-4xl font-bold tracking-tight">
@@ -105,15 +96,10 @@ export default function RegisterPage() {
             </p>
           </div>
 
-          {/* FORMULARIO */}
-
           <form
             onSubmit={handleSubmit}
             className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
           >
-
-            {/* NOMBRE */}
-
             <div>
               <label
                 htmlFor="name"
@@ -126,16 +112,13 @@ export default function RegisterPage() {
                 id="name"
                 type="text"
                 value={name}
-                onChange={(event) =>
-                  setName(event.target.value)
-                }
+                onChange={(event) => setName(event.target.value)}
                 placeholder="Tu nombre"
                 required
+                autoComplete="name"
                 className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none transition placeholder:text-gray-600 focus:border-white/30"
               />
             </div>
-
-            {/* EMAIL */}
 
             <div className="mt-5">
               <label
@@ -149,16 +132,13 @@ export default function RegisterPage() {
                 id="email"
                 type="email"
                 value={email}
-                onChange={(event) =>
-                  setEmail(event.target.value)
-                }
+                onChange={(event) => setEmail(event.target.value)}
                 placeholder="tu@email.com"
                 required
+                autoComplete="email"
                 className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none transition placeholder:text-gray-600 focus:border-white/30"
               />
             </div>
-
-            {/* CONTRASEÑA */}
 
             <div className="mt-5">
               <label
@@ -172,17 +152,14 @@ export default function RegisterPage() {
                 id="password"
                 type="password"
                 value={password}
-                onChange={(event) =>
-                  setPassword(event.target.value)
-                }
+                onChange={(event) => setPassword(event.target.value)}
                 placeholder="Mínimo 6 caracteres"
                 required
                 minLength={6}
+                autoComplete="new-password"
                 className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none transition placeholder:text-gray-600 focus:border-white/30"
               />
             </div>
-
-            {/* ERROR */}
 
             {error && (
               <div className="mt-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -190,34 +167,24 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {/* BOTÓN */}
-
             <button
               type="submit"
               disabled={loading}
               className="mt-6 w-full rounded-xl bg-white px-4 py-3 font-semibold text-black transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading
-                ? "Creando cuenta..."
-                : "Crear cuenta"}
+              {loading ? "Creando cuenta..." : "Crear cuenta"}
             </button>
-
-            {/* LOGIN */}
 
             <p className="mt-6 text-center text-sm text-gray-500">
               ¿Ya tienes una cuenta?{" "}
-
               <button
                 type="button"
-                onClick={() =>
-                  router.push("/login")
-                }
+                onClick={() => router.push("/login")}
                 className="text-white underline underline-offset-4 hover:text-gray-300"
               >
                 Iniciar sesión
               </button>
             </p>
-
           </form>
         </div>
       </div>

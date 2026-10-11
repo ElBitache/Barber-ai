@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -51,8 +52,15 @@ export default function LoginPage() {
       <div className="mx-auto flex min-h-screen max-w-md items-center px-6">
         <div className="w-full">
           <div className="mb-8 text-center">
-            <div className="mb-4 inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300">
-              🤖 BarberAI
+            <div className="mb-5 flex justify-center">
+              <Image
+                src="/bizstaffia-logo.png"
+                alt="BizStaffIA"
+                width={240}
+                height={110}
+                priority
+                className="h-[110px] w-auto object-contain"
+              />
             </div>
 
             <h1 className="text-4xl font-bold tracking-tight">
@@ -79,6 +87,7 @@ export default function LoginPage() {
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="tu@email.com"
                 required
+                autoComplete="email"
                 className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none transition placeholder:text-gray-600 focus:border-white/30"
               />
             </div>
@@ -94,6 +103,7 @@ export default function LoginPage() {
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="••••••••"
                 required
+                autoComplete="current-password"
                 className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none transition placeholder:text-gray-600 focus:border-white/30"
               />
             </div>

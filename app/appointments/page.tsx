@@ -542,7 +542,7 @@ export default function Appointments() {
               </div>
 
               <span className="text-sm font-bold tracking-[0.2em] text-gray-300">
-                BARBERAI
+                BizStaffIA
               </span>
             </button>
 

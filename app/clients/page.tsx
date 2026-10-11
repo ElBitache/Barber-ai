@@ -267,7 +267,7 @@ export default function ClientsPage() {
         <header className="flex flex-col justify-between gap-6 border-b border-white/10 pb-8 sm:flex-row sm:items-end">
           <div>
             <p className="text-sm font-semibold tracking-[0.2em] text-gray-500">
-              BARBERAI
+              BizStaffIA
             </p>
 
             <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
@@ -648,7 +648,7 @@ export default function ClientsPage() {
                     </h2>
 
                     <p className="mt-1 text-sm text-gray-500">
-                      Cliente de BarberAI
+                      Cliente de BizStaffIA
                     </p>
                   </div>
                 </div>

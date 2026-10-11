@@ -206,9 +206,9 @@ export default function Dashboard() {
           body: JSON.stringify({
             to: "elrockstar160@gmail.com",
             subject:
-              "BarberAI funciona 🚀",
+              "BizStaffIA funciona 🚀",
             message:
-              "¡Hola! Este correo fue enviado directamente desde tu Dashboard de BarberAI.",
+              "¡Hola! Este correo fue enviado directamente desde tu Dashboard de BizStaffIA.",
           }),
         }
       );
@@ -256,7 +256,7 @@ export default function Dashboard() {
           body: JSON.stringify({
             to: "+19566257596",
             message:
-              "BarberAI SMS de prueba 🚀",
+              "BizStaffIA SMS de prueba 🚀",
           }),
         }
       );
@@ -569,7 +569,7 @@ export default function Dashboard() {
 
               <div>
                 <p className="font-bold tracking-wide">
-                  BARBERAI
+                  BizStaffIA
                 </p>
 
                 <p className="text-xs text-gray-500">
@@ -703,7 +703,7 @@ export default function Dashboard() {
                   </div>
 
                   <span className="text-sm font-bold tracking-wider">
-                    BARBERAI
+                    BizStaffIA
                   </span>
 
                 </div>
@@ -833,7 +833,7 @@ export default function Dashboard() {
                     <div className="mt-2 space-y-2">
 
                       <p className="text-sm text-gray-500">
-                        Tu negocio está utilizando este plan de BarberAI.
+                        Tu negocio está utilizando este plan de BizStaffIA.
                       </p>
 
                       {business.subscriptionStatus ===
@@ -1154,7 +1154,7 @@ export default function Dashboard() {
                   </h2>
 
                   <p className="mt-2 text-sm text-gray-500">
-                    Prueba el sistema de correo de BarberAI.
+                    Prueba el sistema de correo de BizStaffIA.
                   </p>
 
                   {emailMessage && (
