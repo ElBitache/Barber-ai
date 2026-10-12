@@ -15,13 +15,15 @@ const geistMono = Geist_Mono({
 const siteName = "BizStaffIA";
 
 const siteDescription =
-  "BizStaffIA ayuda a los negocios a gestionar la atención al cliente, responder consultas, organizar citas y administrar la información de su negocio desde una sola plataforma.";
+  "Descubre BizStaffIA, la plataforma de inteligencia artificial para negocios. Organiza citas, gestiona clientes y mejora la atención al cliente desde un solo lugar.";
+
+const siteUrl = "https://barber-ai-one.vercel.app";
 
 export const metadata: Metadata = {
   applicationName: siteName,
 
   title: {
-    default: "BizStaffIA | Inteligencia artificial para tu negocio",
+    default: "BizStaffIA | Empleados de IA para negocios",
     template: "%s | BizStaffIA",
   },
 
@@ -30,20 +32,21 @@ export const metadata: Metadata = {
   keywords: [
     "BizStaffIA",
     "inteligencia artificial para negocios",
-    "automatización de negocios",
-    "atención al cliente con IA",
+    "empleados virtuales con IA",
     "asistente virtual para empresas",
-    "gestión de citas",
+    "atención al cliente con inteligencia artificial",
+    "gestión de citas para negocios",
     "gestión de clientes",
+    "automatización empresarial",
     "software para barberías",
     "software para restaurantes",
-    "automatización para profesionales",
-    "SaaS para empresas",
+    "IA para empresas de servicios",
+    "software empresarial",
   ],
 
   category: "technology",
 
-  metadataBase: new URL("https://barber-ai-one.vercel.app"),
+  metadataBase: new URL(siteUrl),
 
   alternates: {
     canonical: "/",
@@ -56,17 +59,31 @@ export const metadata: Metadata = {
     title: "BizStaffIA | Tu negocio, más inteligente",
     description: siteDescription,
     url: "/",
+    images: [
+      {
+        url: "/bizstaffia-logo.png",
+        alt: "BizStaffIA, inteligencia artificial para negocios",
+      },
+    ],
   },
 
   twitter: {
     card: "summary_large_image",
-    title: "BizStaffIA | Inteligencia artificial para tu negocio",
+    title: "BizStaffIA | Empleados de IA para negocios",
     description: siteDescription,
+    images: ["/bizstaffia-logo.png"],
   },
 
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
   },
 
   appleWebApp: {
