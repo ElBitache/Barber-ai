@@ -1,0 +1,4 @@
+CREATE TYPE "BusinessType" AS ENUM ('BARBERSHOP', 'BEAUTY_SALON');
+
+ALTER TABLE "Business"
+ADD COLUMN "businessType" "BusinessType" NOT NULL DEFAULT 'BARBERSHOP';

@@ -4,6 +4,28 @@ import { NextResponse } from "next/server";
 
 const TRIAL_DAYS = 14;
 
+const ALLOWED_BUSINESS_TYPES = [
+  "BARBERSHOP",
+  "BEAUTY_SALON",
+  "RESTAURANT",
+  "PLUMBER",
+  "ELECTRICIAN",
+  "CLEANING",
+  "AUTO_REPAIR",
+  "HOME_SERVICES",
+  "VETERINARY",
+  "DENTAL_CLINIC",
+] as const;
+
+type BusinessType = (typeof ALLOWED_BUSINESS_TYPES)[number];
+
+function isBusinessType(value: unknown): value is BusinessType {
+  return (
+    typeof value === "string" &&
+    (ALLOWED_BUSINESS_TYPES as readonly string[]).includes(value)
+  );
+}
+
 const MAX_NAME_LENGTH = 100;
 const MAX_DESCRIPTION_LENGTH = 2000;
 const MAX_SERVICES_LENGTH = 5000;
@@ -17,7 +39,7 @@ const DEFAULT_AI_NAME = "Empleado IA";
 const DEFAULT_AI_PERSONALITY = "amigable";
 
 const DEFAULT_AI_WELCOME =
-  "¡Hola! 👋 Soy el empleado de IA de tu negocio. ¿En qué puedo ayudarte?";
+  "Â¡Hola! ðŸ‘‹ Soy el empleado de IA de tu negocio. Â¿En quÃ© puedo ayudarte?";
 
 function cleanText(value: unknown) {
   return String(value ?? "").trim();
@@ -28,7 +50,7 @@ function isTooLong(value: string, maxLength: number) {
 }
 
 // =====================================================
-// GET — OBTENER NEGOCIO
+// GET â€” OBTENER NEGOCIO
 // =====================================================
 
 export async function GET() {
@@ -38,7 +60,7 @@ export async function GET() {
     if (!userId) {
       return NextResponse.json(
         {
-          error: "No hay una sesión activa.",
+          error: "No hay una sesiÃ³n activa.",
         },
         {
           status: 401,
@@ -53,6 +75,8 @@ export async function GET() {
 
       select: {
         id: true,
+
+        businessType: true,
 
         name: true,
 
@@ -120,7 +144,7 @@ export async function GET() {
       business,
     });
   } catch (error) {
-    console.error("❌ Error obteniendo negocio:", error);
+    console.error("âŒ Error obteniendo negocio:", error);
 
     return NextResponse.json(
       {
@@ -134,13 +158,13 @@ export async function GET() {
 }
 
 // =====================================================
-// POST — CREAR / ACTUALIZAR NEGOCIO
+// POST â€” CREAR / ACTUALIZAR NEGOCIO
 // =====================================================
 
 export async function POST(request: Request) {
   try {
     // ===================================================
-    // AUTENTICACIÓN
+    // AUTENTICACIÃ“N
     // ===================================================
 
     const userId = await getSessionUserId();
@@ -148,7 +172,7 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json(
         {
-          error: "No hay una sesión activa.",
+          error: "No hay una sesiÃ³n activa.",
         },
         {
           status: 401,
@@ -167,7 +191,7 @@ export async function POST(request: Request) {
     } catch {
       return NextResponse.json(
         {
-          error: "El cuerpo de la solicitud no es válido.",
+          error: "El cuerpo de la solicitud no es vÃ¡lido.",
         },
         {
           status: 400,
@@ -178,7 +202,7 @@ export async function POST(request: Request) {
     if (!body || typeof body !== "object") {
       return NextResponse.json(
         {
-          error: "Los datos enviados no son válidos.",
+          error: "Los datos enviados no son vÃ¡lidos.",
         },
         {
           status: 400,
@@ -187,6 +211,23 @@ export async function POST(request: Request) {
     }
 
     const data = body as Record<string, unknown>;
+
+    const requestedBusinessType =
+      data.businessType === undefined ? undefined : data.businessType;
+
+    if (
+      requestedBusinessType !== undefined &&
+      !isBusinessType(requestedBusinessType)
+    ) {
+      return NextResponse.json(
+        {
+          error: "El tipo de negocio seleccionado no es válido.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
     // ===================================================
     // DATOS DEL NEGOCIO
@@ -238,7 +279,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Nombre, descripción, servicios y horarios son obligatorios.",
+            "Nombre, descripciÃ³n, servicios y horarios son obligatorios.",
         },
         {
           status: 400,
@@ -247,7 +288,7 @@ export async function POST(request: Request) {
     }
 
     // ===================================================
-    // LÍMITES DE TEXTO
+    // LÃMITES DE TEXTO
     // ===================================================
 
     if (isTooLong(name, MAX_NAME_LENGTH)) {
@@ -269,7 +310,7 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json(
         {
-          error: `La descripción no puede superar los ${MAX_DESCRIPTION_LENGTH} caracteres.`,
+          error: `La descripciÃ³n no puede superar los ${MAX_DESCRIPTION_LENGTH} caracteres.`,
         },
         {
           status: 400,
@@ -380,6 +421,10 @@ export async function POST(request: Request) {
           },
 
           data: {
+            ...(requestedBusinessType !== undefined
+              ? { businessType: requestedBusinessType }
+              : {}),
+
             name,
 
             description,
@@ -403,6 +448,8 @@ export async function POST(request: Request) {
 
           select: {
             id: true,
+
+            businessType: true,
 
             name: true,
 
@@ -444,7 +491,7 @@ export async function POST(request: Request) {
         });
 
       console.log(
-        "✅ Negocio actualizado:",
+        "âœ… Negocio actualizado:",
         {
           businessId: business.id,
           userId,
@@ -458,7 +505,7 @@ export async function POST(request: Request) {
     }
 
     // ===================================================
-    // CREAR TRIAL DE 14 DÍAS
+    // CREAR TRIAL DE 14 DÃAS
     // ===================================================
 
     const trialStartedAt = new Date();
@@ -479,6 +526,8 @@ export async function POST(request: Request) {
     const business =
       await prisma.business.create({
         data: {
+          businessType: requestedBusinessType ?? "BARBERSHOP",
+
           name,
 
           description,
@@ -513,6 +562,8 @@ export async function POST(request: Request) {
 
         select: {
           id: true,
+
+          businessType: true,
 
           name: true,
 
@@ -554,7 +605,7 @@ export async function POST(request: Request) {
       });
 
     console.log(
-      "🎁 Trial creado:",
+      "ðŸŽ Trial creado:",
       {
         businessId: business.id,
         userId,
@@ -570,7 +621,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error(
-      "❌ Error guardando negocio:",
+      "âŒ Error guardando negocio:",
       error
     );
 

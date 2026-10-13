@@ -19,6 +19,7 @@ model User {
 model Business {
   id                         Int                @id @default(autoincrement())
   name                       String
+  businessType               BusinessType       @default(BARBERSHOP)
   description                String
   services                   String
   hours                      String
@@ -33,7 +34,7 @@ model Business {
   stripeSubscriptionId       String?            @unique
   aiName                     String             @default("Empleado IA")
   aiPersonality              String             @default("amigable")
-  aiWelcome                 String             @default("¡Hola! 👋 Soy el empleado de IA de tu negocio. ¿En qué puedo ayudarte?")
+  aiWelcome                  String             @default("¡Hola! 👋 Soy el empleado de IA de tu negocio. ¿En qué puedo ayudarte?")
   aiCanBook                  Boolean            @default(true)
   aiCanCancel                Boolean            @default(true)
   aiCanReschedule            Boolean            @default(true)
@@ -85,6 +86,19 @@ model MonthlyUsage {
 
   @@unique([businessId, month])
   @@index([businessId])
+}
+
+enum BusinessType {
+  BARBERSHOP
+  BEAUTY_SALON
+  RESTAURANT
+  PLUMBER
+  ELECTRICIAN
+  CLEANING
+  AUTO_REPAIR
+  HOME_SERVICES
+  VETERINARY
+  DENTAL_CLINIC
 }
 
 enum Plan {
